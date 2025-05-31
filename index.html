@@ -3,2034 +3,1657 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Darson Securities Limited - Commission Software</title>
+    <title>Darson Securities Limited - Commission Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script type="module">
+        // Firebase App (the core Firebase SDK) is always required and must be listed first
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            signInWithCustomToken, 
+            onAuthStateChanged,
+            setPersistence,
+            browserLocalPersistence // Or browserSessionPersistence
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            setDoc, 
+            updateDoc, 
+            deleteDoc, 
+            collection, 
+            addDoc,
+            query, 
+            where, 
+            getDocs,
+            Timestamp,
+            writeBatch,
+            onSnapshot,
+            setLogLevel
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase instances
+        let app;
+        let auth;
+        let db;
+        let userId;
+        let currentView = 'login'; // Initial view
+
+        // App configuration
+        const APP_NAME = "Darson Securities Limited";
+        const APP_SUBTITLE = "Commission Report";
+        const DEVELOPER_INFO = "Developed by Afrasiab Asghar. Visit www.Nexgensites.org or Contact +923060406003";
+        const LOGIN_USERNAME = "DARSON";
+        const LOGIN_PASSWORD = "AFRASIAB"; // Also used for report deletion
+
+        // Firestore collection paths
+        const getTransactionsCollectionPath = () => `artifacts/${appId}/users/${userId}/transactions`;
+        const getDailySummariesCollectionPath = () => `artifacts/${appId}/users/${userId}/dailySummaries`;
+        const getMonthlySummariesCollectionPath = () => `artifacts/${appId}/users/${userId}/monthlySummaries`;
+        const getPaymentRequestsCollectionPath = () => `artifacts/${appId}/users/${userId}/paymentRequests`;
+        const getAppStateDocPath = () => `artifacts/${appId}/users/${userId}/appState/currentUserState`;
+        
+        let appId = typeof __app_id !== 'undefined' ? __app_id : 'brokerage-app-dev';
+
+
+        // State variables
+        let dailyEntries = [];
+        let currentBalance = 0;
+        let balanceVisible = true;
+        let selectedDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+        // Commission Rates Structure
+        const commissionRates = [
+            { min: 0.01, max: 3.00, rate: 0.03, type: 'flat' },
+            { min: 3.01, max: 20.00, rate: 0.07, type: 'flat' },
+            { min: 20.01, max: 40.00, rate: 0.09, type: 'flat' },
+            { min: 40.01, max: 50.00, rate: 0.12, type: 'flat' },
+            { min: 50.01, max: 90.00, rate: 0.14, type: 'flat' },
+            { min: 90.01, max: 100.00, rate: 0.17, type: 'flat' },
+            { min: 100.01, max: Infinity, rate: 0.0017, type: 'percentage' } // 0.17%
+        ];
+
+        // Deduction percentages
+        const HEAD_OFFICE_DEDUCTION_RATE = 0.40; // 40%
+        const TAX_ON_REMAINING_RATE = 0.12; // 12% on the remaining 60%
+
+        // DOM Elements (to be assigned in DOMContentLoaded)
+        let loginSection, appSection, mainContent, sidebar;
+        let usernameInput, passwordInput, loginError;
+        let currentViewTitle, currentDateDisplay, mainHeaderTitleEl, footerDevInfoP, loginDevInfoP;
+        // Dashboard elements
+        let stockNameInput, quantityInput, rateInput, addEntryButton, entriesTableBody, dailySummaryDiv;
+        let dashboardDateInput, totalGrossCommissionEl, headOfficeDeductionEl, taxableAmountEl, taxDeductionEl, netCommissionEl;
+        let previousBalanceEl, currentDayNetCommissionEl, newBalanceEl, saveDayButton, printDayButton;
+        let balanceDisplayEl, toggleBalanceButton;
+        // Report elements
+        let reportDateInput, reportMonthInput, viewDateReportButton, viewMonthReportButton, reportContentDiv, deleteReportButton;
+        // Payment elements
+        let prDateInput, prAmountInput, prAddButton, prListDiv;
+        // Month Closure elements
+        let mcMonthInput, mcCloseMonthButton, mcReportDiv;
+        let modal, modalContent, modalCloseButton, modalTitle, modalBody, modalActions;
+
+
+        // --- UTILITY FUNCTIONS ---
+        const formatCurrency = (amount) => `PKR ${Number(amount).toFixed(2)}`;
+        const formatDate = (dateStrOrObj) => {
+            const date = new Date(dateStrOrObj);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        const getMonthYear = (dateStrOrObj) => {
+            const date = new Date(dateStrOrObj);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            return `${year}-${month}`;
+        }
+
+        const showToast = (message, type = 'info') => {
+            const toast = document.getElementById('toastNotification');
+            const toastMessage = document.getElementById('toastMessage');
+            if (!toast || !toastMessage) {
+                console.warn("Toast elements not found for message:", message);
+                return;
+            }
+            toastMessage.textContent = message;
+            
+            toast.classList.remove('hidden', 'bg-green-500', 'bg-red-500', 'bg-blue-500', 'bg-yellow-500');
+            if (type === 'success') toast.classList.add('bg-green-500');
+            else if (type === 'error') toast.classList.add('bg-red-500');
+            else if (type === 'warning') toast.classList.add('bg-yellow-500');
+            else toast.classList.add('bg-blue-500');
+            
+            toast.classList.remove('opacity-0');
+            toast.classList.add('opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.classList.add('hidden'), 500);
+            }, 3000);
+        };
+        
+        const showModal = (title, bodyContent, actions = []) => {
+            if (!modal || !modalTitle || !modalBody || !modalActions) {
+                console.error("Modal elements not found.");
+                return;
+            }
+            modalTitle.textContent = title;
+            modalBody.innerHTML = ''; // Clear previous content
+            if (typeof bodyContent === 'string') {
+                const p = document.createElement('p');
+                p.innerHTML = bodyContent; // Use innerHTML to allow basic HTML like <br>
+                modalBody.appendChild(p);
+            } else {
+                modalBody.appendChild(bodyContent); // Append DOM element directly
+            }
+
+            modalActions.innerHTML = '';
+            actions.forEach(action => {
+                const button = document.createElement('button');
+                button.textContent = action.label;
+                button.className = action.className || 'px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600';
+                button.onclick = () => {
+                    action.callback(); // Consider if callback should prevent hideModal
+                    hideModal();
+                };
+                modalActions.appendChild(button);
+            });
+            
+            const cancelButton = document.createElement('button');
+            cancelButton.textContent = 'Cancel';
+            cancelButton.className = 'px-4 py-2 bg-gray-300 text-black rounded hover:bg-gray-400 ml-2';
+            cancelButton.onclick = hideModal;
+            modalActions.appendChild(cancelButton);
+
+            modal.classList.remove('hidden');
+        };
+
+        const hideModal = () => {
+            if(modal) modal.classList.add('hidden');
+        };
+
+        const promptPassword = (callbackOnSuccess) => {
+            const passwordPromptDiv = document.createElement('div');
+            passwordPromptDiv.innerHTML = `
+                <label for="modalPasswordInput" class="block text-sm font-medium text-gray-700">Enter Password:</label>
+                <input type="password" id="modalPasswordInput" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" autocomplete="current-password">
+                <p id="modalPasswordError" class="text-red-500 text-sm mt-1 hidden"></p>
+            `;
+            const actions = [{
+                label: 'Submit',
+                className: 'px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600',
+                callback: () => {
+                    const enteredPassword = document.getElementById('modalPasswordInput').value;
+                    const errorEl = document.getElementById('modalPasswordError');
+                    if (enteredPassword === LOGIN_PASSWORD) {
+                        if (errorEl) errorEl.classList.add('hidden');
+                        callbackOnSuccess();
+                        // hideModal() will be called by the showModal's action wrapper
+                    } else {
+                        if (errorEl) {
+                           errorEl.textContent = 'Incorrect password.';
+                           errorEl.classList.remove('hidden');
+                        }
+                         showToast('Incorrect password.', 'error');
+                         // Modal remains open for re-try if showModal's callback doesn't auto-hide on error.
+                         // Current implementation hides it.
+                    }
+                }
+            }];
+            showModal('Password Required', passwordPromptDiv, actions);
+        };
+
+
+        // --- FIREBASE SETUP ---
+        const initializeFirebase = async () => {
+            try {
+                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                if (!firebaseConfig.apiKey) { 
+                    console.error("Firebase config is missing or invalid.");
+                    if (loginError) {
+                        loginError.textContent = "Application configuration error. Cannot initialize.";
+                        loginError.classList.remove('hidden');
+                    }
+                    return false;
+                }
+
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('debug'); 
+
+                await setPersistence(auth, browserLocalPersistence); 
+
+                return new Promise((resolve) => {
+                    onAuthStateChanged(auth, async (user) => {
+                        if (user) {
+                            userId = user.uid;
+                            console.log("User is signed in with UID:", userId);
+                            await loadInitialData();
+                            resolve(true);
+                        } else {
+                            console.log("No user signed in. Attempting sign in...");
+                            try {
+                                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                    await signInWithCustomToken(auth, __initial_auth_token);
+                                } else {
+                                    await signInAnonymously(auth);
+                                }
+                            } catch (error) {
+                                console.error("Error during automated sign-in:", error);
+                                if(loginError) {
+                                    loginError.textContent = "Authentication failed. Please try again later.";
+                                    loginError.classList.remove('hidden');
+                                }
+                                resolve(false);
+                            }
+                        }
+                    });
+                });
+
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+                if (loginError) {
+                    loginError.textContent = "Failed to initialize application services.";
+                    loginError.classList.remove('hidden');
+                }
+                return false;
+            }
+        };
+
+        // --- DATA HANDLING ---
+        const loadInitialData = async () => {
+            if (!userId) return;
+            try {
+                const appStateRef = doc(db, getAppStateDocPath());
+                const appStateSnap = await getDoc(appStateRef);
+                if (appStateSnap.exists()) {
+                    const data = appStateSnap.data();
+                    currentBalance = data.currentBalance || 0;
+                } else {
+                    await setDoc(appStateRef, { currentBalance: 0, lastMonthClosed: null });
+                    currentBalance = 0;
+                }
+                updateBalanceDisplay();
+                if (currentView === 'dashboard') {
+                    loadDashboardData(); 
+                }
+            } catch (error) {
+                console.error("Error loading initial data:", error);
+                showToast("Error loading initial application state.", "error");
+            }
+        };
+
+        const updateAppState = async (data) => {
+            if (!userId) return;
+            try {
+                const appStateRef = doc(db, getAppStateDocPath());
+                await updateDoc(appStateRef, data);
+            } catch (error) {
+                console.error("Error updating app state:", error);
+                showToast("Error saving application state.", "error");
+            }
+        };
+
+        // --- COMMISSION CALCULATION ---
+        const calculateCommissionForItem = (quantity, stockRate) => {
+            let commissionPerStock = 0;
+            let totalCommission = 0;
+
+            for (const tier of commissionRates) {
+                if (stockRate >= tier.min && stockRate <= tier.max) {
+                    if (tier.type === 'flat') {
+                        commissionPerStock = tier.rate;
+                        totalCommission = quantity * commissionPerStock;
+                    } else if (tier.type === 'percentage') {
+                        commissionPerStock = (stockRate * tier.rate); 
+                        totalCommission = quantity * stockRate * tier.rate;
+                    }
+                    break;
+                }
+            }
+            return { commissionPerStock, totalCommission };
+        };
+        
+        const calculateDailySummary = () => {
+            const gross = dailyEntries.reduce((sum, entry) => sum + entry.totalCommission, 0);
+            const hoDeduction = gross * HEAD_OFFICE_DEDUCTION_RATE;
+            const remainingAfterHO = gross - hoDeduction;
+            const tax = remainingAfterHO * TAX_ON_REMAINING_RATE;
+            const net = remainingAfterHO - tax;
+
+            return {
+                grossCommission: gross,
+                headOfficeDeduction: hoDeduction,
+                taxableAmount: remainingAfterHO, 
+                taxDeduction: tax,
+                netCommission: net
+            };
+        };
+
+        // --- UI UPDATES & NAVIGATION ---
+        const switchView = (viewName) => {
+            currentView = viewName;
+            document.querySelectorAll('#mainContent > div[data-view]').forEach(div => div.classList.add('hidden'));
+            const targetView = document.getElementById(`view-${viewName}`);
+            
+            if (targetView) {
+                targetView.classList.remove('hidden');
+                if(currentViewTitle) currentViewTitle.textContent = APP_SUBTITLE + (viewName !== 'dashboard' ? ` - ${viewName.charAt(0).toUpperCase() + viewName.slice(1).replace(/([A-Z])/g, ' $1')}` : '');
+            } else {
+                console.error(`View "${viewName}" not found.`);
+                const dashboardView = document.getElementById('view-dashboard');
+                if (dashboardView) dashboardView.classList.remove('hidden'); 
+                if(currentViewTitle) currentViewTitle.textContent = APP_SUBTITLE;
+            }
+            
+            document.querySelectorAll('#sidebar a').forEach(a => {
+                a.classList.remove('bg-gray-700', 'text-white');
+                a.classList.add('text-gray-300', 'hover:bg-gray-700', 'hover:text-white');
+                if (a.getAttribute('data-view') === viewName) {
+                    a.classList.add('bg-gray-700', 'text-white');
+                }
+            });
+
+            if (viewName === 'dashboard') loadDashboardData();
+            if (viewName === 'dailyReports' || viewName === 'monthlyReports') clearReportContent();
+            if (viewName === 'paymentRequests') loadPaymentRequests();
+            if (viewName === 'monthClosure') clearMonthClosureReport();
+
+            if(currentDateDisplay) currentDateDisplay.textContent = formatDate(new Date()); 
+        };
+
+        const updateBalanceDisplay = () => {
+            if (balanceDisplayEl) {
+                balanceDisplayEl.textContent = balanceVisible ? formatCurrency(currentBalance) : 'PKR ******';
+            }
+            if (previousBalanceEl) previousBalanceEl.textContent = formatCurrency(currentBalance); 
+            updateDashboardSummary(); 
+        };
+
+        const toggleBalanceVisibility = () => {
+            balanceVisible = !balanceVisible;
+            if(toggleBalanceButton) toggleBalanceButton.innerHTML = balanceVisible ? eyeIconSVG() : eyeSlashIconSVG();
+            updateBalanceDisplay();
+        };
+        
+        // --- DASHBOARD FUNCTIONS ---
+        const loadDashboardData = () => {
+            if(dashboardDateInput) dashboardDateInput.value = selectedDate;
+            dailyEntries = []; 
+            renderEntriesTable();
+            updateDashboardSummary();
+            updateBalanceDisplay(); 
+            checkExistingDailySummary(selectedDate);
+        };
+
+        const checkExistingDailySummary = async (date) => {
+            if (!userId || !db) return;
+            const summaryRef = doc(db, getDailySummariesCollectionPath(), date);
+            try {
+                const docSnap = await getDoc(summaryRef);
+                if (docSnap.exists()) {
+                    showToast(`Data for ${date} already saved. Editing will overwrite.`, "warning");
+                    const data = docSnap.data();
+                    dailyEntries = data.transactions || [];
+                    renderEntriesTable();
+                    updateDashboardSummary();
+                }
+            } catch (error) {
+                console.error("Error checking existing summary:", error);
+            }
+        };
+
+        const handleAddEntry = () => {
+            if (!stockNameInput || !quantityInput || !rateInput) return;
+            const stockName = stockNameInput.value.trim();
+            const quantity = parseInt(quantityInput.value);
+            const rate = parseFloat(rateInput.value);
+
+            if (!stockName || isNaN(quantity) || quantity <= 0 || isNaN(rate) || rate <= 0) {
+                showToast("Please enter valid stock name, quantity, and rate.", "error");
+                return;
+            }
+
+            const { commissionPerStock, totalCommission } = calculateCommissionForItem(quantity, rate);
+            
+            dailyEntries.push({
+                id: `temp-${Date.now()}`, 
+                stockName,
+                quantity,
+                rate,
+                commissionPerStock,
+                totalCommission
+            });
+
+            renderEntriesTable();
+            updateDashboardSummary();
+
+            stockNameInput.value = '';
+            quantityInput.value = '';
+            rateInput.value = '';
+            stockNameInput.focus();
+        };
+
+        const renderEntriesTable = () => {
+            if (!entriesTableBody) return;
+            entriesTableBody.innerHTML = ''; 
+            if (dailyEntries.length === 0) {
+                entriesTableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4">No entries added yet.</td></tr>`; // colspan updated to 7
+                return;
+            }
+            dailyEntries.forEach((entry, index) => {
+                const row = entriesTableBody.insertRow();
+                row.innerHTML = `
+                    <td class="px-4 py-2 border">${index + 1}</td>
+                    <td class="px-4 py-2 border">${entry.stockName}</td>
+                    <td class="px-4 py-2 border text-right">${entry.quantity}</td>
+                    <td class="px-4 py-2 border text-right">${formatCurrency(entry.rate)}</td>
+                    <td class="px-4 py-2 border text-right">${formatCurrency(entry.commissionPerStock)}</td>
+                    <td class="px-4 py-2 border text-right">${formatCurrency(entry.totalCommission)}</td>
+                    <td class="px-4 py-2 border print-hidden"><button data-id="${entry.id}" class="text-red-500 hover:text-red-700 remove-entry-btn">Remove</button></td>
+                `;
+            });
+            document.querySelectorAll('.remove-entry-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const entryId = e.target.getAttribute('data-id');
+                    dailyEntries = dailyEntries.filter(item => item.id !== entryId);
+                    renderEntriesTable();
+                    updateDashboardSummary();
+                });
+            });
+        };
+
+        const updateDashboardSummary = () => {
+            if (!totalGrossCommissionEl || !headOfficeDeductionEl || !taxableAmountEl || !taxDeductionEl || !netCommissionEl || !previousBalanceEl || !currentDayNetCommissionEl || !newBalanceEl) return;
+            const summary = calculateDailySummary();
+            totalGrossCommissionEl.textContent = formatCurrency(summary.grossCommission);
+            headOfficeDeductionEl.textContent = formatCurrency(summary.headOfficeDeduction);
+            taxableAmountEl.textContent = formatCurrency(summary.taxableAmount);
+            taxDeductionEl.textContent = formatCurrency(summary.taxDeduction);
+            netCommissionEl.textContent = formatCurrency(summary.netCommission);
+            
+            previousBalanceEl.textContent = formatCurrency(currentBalance); 
+            currentDayNetCommissionEl.textContent = formatCurrency(summary.netCommission);
+            newBalanceEl.textContent = formatCurrency(currentBalance + summary.netCommission);
+        };
+
+        const handleSaveDay = async () => {
+            if (dailyEntries.length === 0) {
+                showToast("No entries to save.", "warning");
+                return;
+            }
+            if (!userId || !db) {
+                showToast("User not authenticated or database not ready. Cannot save.", "error");
+                return;
+            }
+            if (!dashboardDateInput) return;
+            const dateToSave = dashboardDateInput.value;
+            if (!dateToSave) {
+                showToast("Please select a valid date.", "error");
+                return;
+            }
+
+            const summary = calculateDailySummary();
+            const dailySummaryData = {
+                date: dateToSave,
+                monthYear: getMonthYear(dateToSave),
+                totalGrossCommission: summary.grossCommission,
+                headOfficeDeduction: summary.headOfficeDeduction,
+                taxableAmount: summary.taxableAmount,
+                taxDeduction: summary.taxDeduction,
+                netCommission: summary.netCommission,
+                transactions: dailyEntries.map(e => ({ 
+                    stockName: e.stockName, 
+                    quantity: e.quantity, 
+                    rate: e.rate, 
+                    commissionPerStock: e.commissionPerStock, 
+                    totalCommission: e.totalCommission 
+                })),
+                openingBalance: currentBalance, 
+                closingBalance: currentBalance + summary.netCommission,
+                createdAt: Timestamp.now()
+            };
+
+            try {
+                const dailySummaryRef = doc(db, getDailySummariesCollectionPath(), dateToSave);
+                const existingSummarySnap = await getDoc(dailySummaryRef);
+                let oldNetCommission = 0;
+                if (existingSummarySnap.exists()) {
+                    oldNetCommission = existingSummarySnap.data().netCommission || 0;
+                    showToast(`Overwriting existing data for ${dateToSave}.`, "info");
+                }
+
+                const batch = writeBatch(db);
+                batch.set(dailySummaryRef, dailySummaryData); 
+
+                const newOverallBalance = currentBalance - oldNetCommission + summary.netCommission;
+                batch.update(doc(db, getAppStateDocPath()), { currentBalance: newOverallBalance });
+                
+                await batch.commit();
+
+                currentBalance = newOverallBalance; 
+                updateBalanceDisplay();
+                showToast(`Day ${dateToSave} saved successfully. New balance: ${formatCurrency(currentBalance)}`, "success");
+                dailyEntries = []; 
+                renderEntriesTable();
+                updateDashboardSummary(); 
+            } catch (error) {
+                console.error("Error saving day:", error);
+                showToast(`Error saving day: ${error.message}`, "error");
+            }
+        };
+        
+        const handlePrintDay = () => {
+            if (dailyEntries.length === 0 && (!reportContentDiv || !reportContentDiv.querySelector('div'))) { 
+                 showToast("No data to print.", "warning");
+                 return;
+            }
+            window.print();
+        };
+
+
+        // --- REPORT FUNCTIONS ---
+        const clearReportContent = () => {
+            if(reportContentDiv) reportContentDiv.innerHTML = '<p class="text-gray-500">Select date or month to view report.</p>';
+            if(deleteReportButton) deleteReportButton.classList.add('hidden');
+        };
+
+        const viewDailyReport = async () => {
+            if(!reportDateInput) return;
+            const date = reportDateInput.value;
+            if (!date) {
+                showToast("Please select a date.", "warning");
+                return;
+            }
+            if (!userId || !db) return;
+
+            try {
+                const summaryRef = doc(db, getDailySummariesCollectionPath(), date);
+                const docSnap = await getDoc(summaryRef);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    renderReport(data, 'daily');
+                    if(deleteReportButton){
+                        deleteReportButton.classList.remove('hidden');
+                        deleteReportButton.setAttribute('data-report-id', date);
+                        deleteReportButton.setAttribute('data-report-type', 'daily');
+                    }
+                } else {
+                    if(reportContentDiv) reportContentDiv.innerHTML = `<p class="text-red-500">No report found for ${date}.</p>`;
+                    if(deleteReportButton) deleteReportButton.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error("Error fetching daily report:", error);
+                showToast(`Error fetching report: ${error.message}`, "error");
+                if(reportContentDiv) reportContentDiv.innerHTML = `<p class="text-red-500">Error fetching report.</p>`;
+                if(deleteReportButton) deleteReportButton.classList.add('hidden');
+            }
+        };
+        
+        const viewMonthlyReport = async () => {
+            if(!reportMonthInput) return;
+            const monthYear = reportMonthInput.value; 
+            if (!monthYear) {
+                showToast("Please select a month.", "warning");
+                return;
+            }
+            if (!userId || !db) return;
+
+            try {
+                const monthlySummaryRef = doc(db, getMonthlySummariesCollectionPath(), monthYear);
+                const monthlySnap = await getDoc(monthlySummaryRef);
+
+                if (monthlySnap.exists()) {
+                     renderReport(monthlySnap.data(), 'monthlySummary');
+                     if(deleteReportButton) {
+                        deleteReportButton.classList.remove('hidden');
+                        deleteReportButton.setAttribute('data-report-id', monthYear);
+                        deleteReportButton.setAttribute('data-report-type', 'monthly');
+                     }
+                } else {
+                    const q = query(collection(db, getDailySummariesCollectionPath()), where("monthYear", "==", monthYear));
+                    const querySnapshot = await getDocs(q);
+                    
+                    if (querySnapshot.empty) {
+                        if(reportContentDiv) reportContentDiv.innerHTML = `<p class="text-red-500">No data found for ${monthYear}.</p>`;
+                        if(deleteReportButton) deleteReportButton.classList.add('hidden');
+                        return;
+                    }
+
+                    let aggregatedData = {
+                        monthYear: monthYear,
+                        totalGrossCommission: 0,
+                        totalHeadOfficeDeduction: 0,
+                        totalTaxableAmount: 0,
+                        totalTaxDeduction: 0,
+                        totalNetCommission: 0,
+                        dailySummaries: []
+                    };
+
+                    querySnapshot.forEach(docSnap => {
+                        const dailyData = docSnap.data();
+                        aggregatedData.totalGrossCommission += dailyData.totalGrossCommission || 0;
+                        aggregatedData.totalHeadOfficeDeduction += dailyData.headOfficeDeduction || 0;
+                        aggregatedData.totalTaxableAmount += dailyData.taxableAmount || 0;
+                        aggregatedData.totalTaxDeduction += dailyData.taxDeduction || 0;
+                        aggregatedData.totalNetCommission += dailyData.netCommission || 0;
+                        aggregatedData.dailySummaries.push(dailyData); 
+                    });
+                    aggregatedData.dailySummaries.sort((a,b) => new Date(a.date) - new Date(b.date));
+
+                    renderReport(aggregatedData, 'monthlyAggregation');
+                    if(deleteReportButton) deleteReportButton.classList.add('hidden'); 
+                }
+
+            } catch (error) {
+                console.error("Error fetching monthly report:", error);
+                showToast(`Error fetching monthly report: ${error.message}`, "error");
+                if(reportContentDiv) reportContentDiv.innerHTML = `<p class="text-red-500">Error fetching monthly report.</p>`;
+                if(deleteReportButton) deleteReportButton.classList.add('hidden');
+            }
+        };
+
+        const renderReport = (data, type) => {
+            if(!reportContentDiv) return;
+            let html = `<div class="printable-area p-4 border rounded-md bg-white">`;
+            html += `<div class="text-center mb-4 print-header">
+                        <h2 class="text-2xl font-bold">${APP_NAME}</h2>
+                        <p class="text-lg">${APP_SUBTITLE}</p>
+                        <p class="text-md">Date: ${type === 'daily' ? formatDate(data.date) : (type === 'monthlySummary' || type === 'monthlyAggregation' ? data.monthYear : formatDate(new Date()))}</p>
+                     </div>`;
+
+            if (type === 'daily') {
+                html += `<h3 class="text-xl font-semibold mb-2">Transactions for ${formatDate(data.date)}</h3>`;
+                html += `<table class="w-full text-sm border-collapse border border-gray-300 report-table">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="px-2 py-1 border">#</th>
+                                    <th class="px-2 py-1 border">Stock Name</th>
+                                    <th class="px-2 py-1 border text-right">Qty</th>
+                                    <th class="px-2 py-1 border text-right">Rate</th>
+                                    <th class="px-2 py-1 border text-right">Comm/Stock</th>
+                                    <th class="px-2 py-1 border text-right">Total Comm.</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+                (data.transactions || []).forEach((item, index) => {
+                    html += `<tr>
+                                <td class="px-2 py-1 border">${index + 1}</td>
+                                <td class="px-2 py-1 border">${item.stockName}</td>
+                                <td class="px-2 py-1 border text-right">${item.quantity}</td>
+                                <td class="px-2 py-1 border text-right">${formatCurrency(item.rate)}</td>
+                                <td class="px-2 py-1 border text-right">${formatCurrency(item.commissionPerStock)}</td>
+                                <td class="px-2 py-1 border text-right">${formatCurrency(item.totalCommission)}</td>
+                             </tr>`;
+                });
+                html += `   </tbody>
+                         </table>`;
+                html += `<div class="mt-4 p-4 border rounded-md bg-gray-50 report-summary">
+                            <h4 class="font-semibold text-lg mb-2">Daily Summary:</h4>
+                            <div class="grid grid-cols-2 gap-x-4">
+                                <p>Opening Balance:</p><p class="text-right font-medium">${formatCurrency(data.openingBalance || 0)}</p>
+                                <p>Total Gross Commission:</p><p class="text-right font-medium">${formatCurrency(data.totalGrossCommission || 0)}</p>
+                                <p>Head Office Deduction (40%):</p><p class="text-right font-medium">${formatCurrency(data.headOfficeDeduction || 0)}</p>
+                                <p>Amount Before Tax:</p><p class="text-right font-medium">${formatCurrency(data.taxableAmount || 0)}</p>
+                                <p>Tax Deduction (12% on Rem.):</p><p class="text-right font-medium">${formatCurrency(data.taxDeduction || 0)}</p>
+                                <p class="font-bold">Net Commission for Day:</p><p class="text-right font-bold">${formatCurrency(data.netCommission || 0)}</p>
+                                <p class="font-bold text-blue-600">Closing Balance:</p><p class="text-right font-bold text-blue-600">${formatCurrency(data.closingBalance || 0)}</p>
+                            </div>
+                         </div>`;
+            } else if (type === 'monthlySummary' || type === 'monthlyAggregation') {
+                html += `<h3 class="text-xl font-semibold mb-2">Summary for ${data.monthYear}</h3>`;
+                 html += `<div class="mt-4 p-4 border rounded-md bg-gray-50 report-summary">
+                            <div class="grid grid-cols-2 gap-x-4">
+                                ${data.openingBalanceForMonth !== undefined ? `<p>Opening Balance for Month:</p><p class="text-right font-medium">${formatCurrency(data.openingBalanceForMonth)}</p>` : ''}
+                                <p>Total Gross Commission:</p><p class="text-right font-medium">${formatCurrency(data.totalGrossCommission || 0)}</p>
+                                <p>Total Head Office Deduction:</p><p class="text-right font-medium">${formatCurrency(data.totalHeadOfficeDeduction || 0)}</p>
+                                <p>Total Taxable Amount:</p><p class="text-right font-medium">${formatCurrency(data.totalTaxableAmount || 0)}</p>
+                                <p>Total Tax Deduction:</p><p class="text-right font-medium">${formatCurrency(data.totalTaxDeduction || 0)}</p>
+                                <p class="font-bold">Total Net Commission for Month:</p><p class="text-right font-bold">${formatCurrency(data.totalNetCommission || 0)}</p>
+                                ${data.totalPaymentsMade !== undefined ? `<p>Total Payments Made:</p><p class="text-right font-medium">${formatCurrency(data.totalPaymentsMade)}</p>` : ''}
+                                ${data.closingBalanceForMonth !== undefined ? `<p class="font-bold text-blue-600">Closing Balance for Month:</p><p class="text-right font-bold text-blue-600">${formatCurrency(data.closingBalanceForMonth)}</p>` : ''}
+                            </div>
+                         </div>`;
+                if (type === 'monthlyAggregation' && data.dailySummaries && data.dailySummaries.length > 0) {
+                    html += `<h4 class="text-lg font-semibold mt-4 mb-2">Daily Breakdown:</h4>`;
+                    data.dailySummaries.forEach(daily => {
+                        html += `<div class="mb-3 p-2 border rounded">
+                                    <strong>${formatDate(daily.date)}:</strong> Net Commission: ${formatCurrency(daily.netCommission || 0)} (Gross: ${formatCurrency(daily.totalGrossCommission || 0)})
+                                 </div>`;
+                    });
+                }
+            }
+            html += `<div class="mt-6 text-xs text-gray-500 print-footer">${DEVELOPER_INFO}</div>`;
+            html += `</div>`; 
+            reportContentDiv.innerHTML = html;
+        };
+
+        const handleDeleteReport = () => {
+            if(!deleteReportButton) return;
+            const reportId = deleteReportButton.getAttribute('data-report-id');
+            const reportType = deleteReportButton.getAttribute('data-report-type');
+
+            if (!reportId || !reportType) {
+                showToast("Cannot identify report to delete.", "error");
+                return;
+            }
+
+            promptPassword(async () => {
+                if (!userId || !db) return;
+                showToast(`Deleting ${reportType} report: ${reportId}...`, "info");
+                try {
+                    if (reportType === 'daily') {
+                        const summaryRef = doc(db, getDailySummariesCollectionPath(), reportId);
+                        const summarySnap = await getDoc(summaryRef);
+                        if (!summarySnap.exists()) {
+                            showToast("Report already deleted or not found.", "warning");
+                            clearReportContent();
+                            return;
+                        }
+                        const deletedNetCommission = summarySnap.data().netCommission || 0;
+                        
+                        const batch = writeBatch(db);
+                        batch.delete(summaryRef);
+                        
+                        const newOverallBalance = currentBalance - deletedNetCommission;
+                        batch.update(doc(db, getAppStateDocPath()), { currentBalance: newOverallBalance });
+                        
+                        await batch.commit();
+
+                        currentBalance = newOverallBalance;
+                        updateBalanceDisplay();
+                        showToast(`Daily report ${reportId} deleted. Balance updated.`, "success");
+                        clearReportContent();
+
+                    } else if (reportType === 'monthly') { 
+                        const summaryRef = doc(db, getMonthlySummariesCollectionPath(), reportId);
+                        await deleteDoc(summaryRef);
+                        showToast(`Monthly summary ${reportId} deleted. Note: This does not delete individual daily records or adjust balance automatically. Recalculate if needed.`, "success");
+                        clearReportContent();
+                    }
+                } catch (error) {
+                    console.error(`Error deleting ${reportType} report:`, error);
+                    showToast(`Error deleting report: ${error.message}`, "error");
+                }
+            });
+        };
+
+        // --- PAYMENT REQUESTS FUNCTIONS ---
+        const loadPaymentRequests = async () => {
+            if (!userId || !db || !prListDiv) return;
+            prListDiv.innerHTML = '<p class="text-gray-500">Loading payment requests...</p>';
+            try {
+                const q = query(collection(db, getPaymentRequestsCollectionPath())); 
+                const querySnapshot = await getDocs(q);
+                const requests = [];
+                querySnapshot.forEach((doc) => {
+                    requests.push({ id: doc.id, ...doc.data() });
+                });
+                requests.sort((a, b) => new Date(b.requestDate) - new Date(a.requestDate));
+                renderPaymentRequests(requests);
+            } catch (error) {
+                console.error("Error loading payment requests:", error);
+                prListDiv.innerHTML = '<p class="text-red-500">Failed to load payment requests.</p>';
+                showToast("Error loading payment requests.", "error");
+            }
+        };
+
+        const renderPaymentRequests = (requests) => {
+            if (!prListDiv) return;
+            prListDiv.innerHTML = '';
+            if (requests.length === 0) {
+                prListDiv.innerHTML = '<p class="text-gray-500">No payment requests found.</p>';
+                return;
+            }
+            const ul = document.createElement('ul');
+            ul.className = 'space-y-3';
+            requests.forEach(req => {
+                const li = document.createElement('li');
+                li.className = 'p-3 border rounded-md bg-white shadow-sm';
+                let statusColor = 'text-yellow-600';
+                if (req.status === 'Approved') statusColor = 'text-blue-600';
+                if (req.status === 'Paid') statusColor = 'text-green-600';
+
+                li.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="font-semibold">Requested: ${formatCurrency(req.requestedAmount)} on ${formatDate(req.requestDate)}</p>
+                            <p class="text-sm ${statusColor}">Status: ${req.status}</p>
+                            ${req.approvedAmount ? `<p class="text-sm">Approved: ${formatCurrency(req.approvedAmount)} ${req.approvalDate ? `on ${formatDate(req.approvalDate)}` : ''}</p>` : ''}
+                            ${req.paidAmount ? `<p class="text-sm">Paid: ${formatCurrency(req.paidAmount)} ${req.paymentDate ? `on ${formatDate(req.paymentDate)}` : ''}</p>` : ''}
+                        </div>
+                        <div class="space-x-2 print-hidden">
+                            ${req.status === 'Pending' ? `<button data-id="${req.id}" class="approve-pr-btn px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">Approve</button>` : ''}
+                            ${req.status === 'Approved' ? `<button data-id="${req.id}" data-approved="${req.approvedAmount}" class="markpaid-pr-btn px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600">Mark Paid</button>` : ''}
+                            <button data-id="${req.id}" class="delete-pr-btn px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">Delete</button>
+                        </div>
+                    </div>
+                `;
+                ul.appendChild(li);
+            });
+            prListDiv.appendChild(ul);
+
+            document.querySelectorAll('.approve-pr-btn').forEach(btn => btn.addEventListener('click', handleApprovePR));
+            document.querySelectorAll('.markpaid-pr-btn').forEach(btn => btn.addEventListener('click', handleMarkPaidPR));
+            document.querySelectorAll('.delete-pr-btn').forEach(btn => btn.addEventListener('click', handleDeletePR));
+        };
+
+        const handleAddPaymentRequest = async () => {
+            if(!prDateInput || !prAmountInput) return;
+            const requestDate = prDateInput.value;
+            const requestedAmount = parseFloat(prAmountInput.value);
+
+            if (!requestDate || isNaN(requestedAmount) || requestedAmount <= 0) {
+                showToast("Please enter a valid date and requested amount.", "error");
+                return;
+            }
+            if (!userId || !db) return;
+
+            const newRequest = {
+                requestDate,
+                requestedAmount,
+                status: 'Pending', 
+                approvedAmount: null,
+                approvalDate: null,
+                paidAmount: null,
+                paymentDate: null,
+                createdAt: Timestamp.now()
+            };
+
+            try {
+                await addDoc(collection(db, getPaymentRequestsCollectionPath()), newRequest);
+                showToast("Payment request added successfully.", "success");
+                prAmountInput.value = ''; 
+                loadPaymentRequests(); 
+            } catch (error) {
+                console.error("Error adding payment request:", error);
+                showToast(`Error adding payment request: ${error.message}`, "error");
+            }
+        };
+
+        const handleApprovePR = (e) => {
+            const prId = e.target.getAttribute('data-id');
+            const approvalFormDiv = document.createElement('div');
+            approvalFormDiv.innerHTML = `
+                <label for="modalApprovedAmount" class="block text-sm font-medium text-gray-700">Approved Amount (PKR):</label>
+                <input type="number" id="modalApprovedAmount" step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <p id="modalApprovalError" class="text-red-500 text-sm mt-1 hidden"></p>
+            `;
+            const actions = [{
+                label: 'Approve Payment',
+                className: 'px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600',
+                callback: async () => {
+                    const approvedAmountInputEl = document.getElementById('modalApprovedAmount');
+                    const errorEl = document.getElementById('modalApprovalError');
+                    if (!approvedAmountInputEl) return;
+
+                    const approvedAmount = parseFloat(approvedAmountInputEl.value);
+                    
+                    if (isNaN(approvedAmount) || approvedAmount <= 0) {
+                        if(errorEl) {
+                            errorEl.textContent = 'Please enter a valid positive amount.';
+                            errorEl.classList.remove('hidden');
+                        }
+                        // showToast('Invalid approved amount.', 'error'); // Toast is good, but modal should stay
+                        return; // Prevent modal from closing by not calling hideModal implicitly
+                    }
+                    if(errorEl) errorEl.classList.add('hidden');
+
+                    if (!userId || !db) return;
+                    try {
+                        const prRef = doc(db, getPaymentRequestsCollectionPath(), prId);
+                        
+                        const batch = writeBatch(db);
+                        batch.update(prRef, {
+                            approvedAmount: approvedAmount,
+                            status: 'Approved',
+                            approvalDate: formatDate(new Date())
+                        });
+
+                        const newOverallBalance = currentBalance - approvedAmount;
+                        batch.update(doc(db, getAppStateDocPath()), { currentBalance: newOverallBalance });
+                        
+                        await batch.commit();
+
+                        currentBalance = newOverallBalance;
+                        updateBalanceDisplay();
+                        showToast(`Payment request approved for ${formatCurrency(approvedAmount)}. Balance updated.`, "success");
+                        loadPaymentRequests();
+                        // hideModal() is called by showModal wrapper if this callback doesn't prevent it
+                    } catch (error) {
+                        console.error("Error approving payment request:", error);
+                        showToast(`Error approving: ${error.message}`, "error");
+                    }
+                }
+            }];
+            showModal('Approve Payment Request', approvalFormDiv, actions);
+        };
+        
+        const handleMarkPaidPR = async (e) => {
+            const prId = e.target.getAttribute('data-id');
+            const approvedAmount = parseFloat(e.target.getAttribute('data-approved')); 
+
+            const paidFormDiv = document.createElement('div');
+            paidFormDiv.innerHTML = `
+                <p class="mb-2">Approved amount was ${formatCurrency(approvedAmount)}.</p>
+                <label for="modalPaidAmount" class="block text-sm font-medium text-gray-700">Paid Amount (PKR):</label>
+                <input type="number" id="modalPaidAmount" step="0.01" value="${approvedAmount.toFixed(2)}" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <p id="modalPaidError" class="text-red-500 text-sm mt-1 hidden"></p>
+            `;
+             const actions = [{
+                label: 'Mark as Paid',
+                className: 'px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600',
+                callback: async () => {
+                    const paidAmountInputEl = document.getElementById('modalPaidAmount');
+                    const errorEl = document.getElementById('modalPaidError');
+                    if(!paidAmountInputEl) return;
+
+                    const paidAmount = parseFloat(paidAmountInputEl.value);
+
+                    if (isNaN(paidAmount) || paidAmount <= 0) {
+                         if(errorEl) {
+                            errorEl.textContent = 'Please enter a valid positive paid amount.';
+                            errorEl.classList.remove('hidden');
+                        }
+                        return; 
+                    }
+                     if(errorEl) errorEl.classList.add('hidden');
+
+                    if (!userId || !db) return;
+                    try {
+                        const prRef = doc(db, getPaymentRequestsCollectionPath(), prId);
+                        await updateDoc(prRef, {
+                            paidAmount: paidAmount,
+                            status: 'Paid',
+                            paymentDate: formatDate(new Date())
+                        });
+                        showToast("Payment request marked as Paid.", "success");
+                        loadPaymentRequests();
+                    } catch (error) {
+                        console.error("Error marking as paid:", error);
+                        showToast(`Error: ${error.message}`, "error");
+                    }
+                }
+            }];
+            showModal('Mark Payment as Paid', paidFormDiv, actions);
+        };
+
+        const handleDeletePR = (e) => {
+            const prId = e.target.getAttribute('data-id');
+            showModal(
+                'Confirm Deletion',
+                'Are you sure you want to delete this payment request? This action cannot be undone. If it was an approved request, the balance will NOT be automatically readjusted.',
+                [{
+                    label: 'Delete',
+                    className: 'px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700',
+                    callback: async () => {
+                         if (!userId || !db) return;
+                        try {
+                            const prRef = doc(db, getPaymentRequestsCollectionPath(), prId);
+                            const prSnap = await getDoc(prRef);
+                            if (prSnap.exists() && prSnap.data().status === 'Approved' && (prSnap.data().approvedAmount || 0) > 0) {
+                                showToast("Warning: Deleting an approved request. Balance was already deducted. Manual adjustment might be needed if this is an error.", "warning");
+                            }
+                            await deleteDoc(prRef);
+                            showToast("Payment request deleted.", "success");
+                            loadPaymentRequests();
+                        } catch (error) {
+                            console.error("Error deleting payment request:", error);
+                            showToast(`Error deleting: ${error.message}`, "error");
+                        }
+                    }
+                }]
+            );
+        };
+
+        // --- MONTH CLOSURE FUNCTIONS ---
+        const clearMonthClosureReport = () => {
+            if(mcReportDiv) mcReportDiv.innerHTML = '<p class="text-gray-500">Select month to generate summary.</p>';
+        };
+        
+        const handleCloseMonth = async () => {
+            if(!mcMonthInput) return;
+            const monthYearToClose = mcMonthInput.value; 
+            if (!monthYearToClose) {
+                showToast("Please select a month to close.", "warning");
+                return;
+            }
+            if (!userId || !db) return;
+
+            showModal(
+                'Confirm Month Closure',
+                `Are you sure you want to close month ${monthYearToClose}? This will generate a summary. This action doesn't prevent further entries for this month but marks a point-in-time summary.`,
+                [{
+                    label: 'Close Month',
+                    className: 'px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700',
+                    callback: async () => {
+                        if(!mcReportDiv) return;
+                        mcReportDiv.innerHTML = `<p class="text-gray-500">Generating summary for ${monthYearToClose}...</p>`;
+                        try {
+                            const dailyQuery = query(collection(db, getDailySummariesCollectionPath()), where("monthYear", "==", monthYearToClose));
+                            const dailySnapshots = await getDocs(dailyQuery);
+
+                            if (dailySnapshots.empty) {
+                                mcReportDiv.innerHTML = `<p class="text-red-500">No daily data found for ${monthYearToClose} to generate a summary.</p>`;
+                                showToast(`No data for ${monthYearToClose}.`, "warning");
+                                return;
+                            }
+
+                            let monthlySummaryData = {
+                                monthYear: monthYearToClose,
+                                totalGrossCommission: 0,
+                                totalHeadOfficeDeduction: 0,
+                                totalTaxableAmount: 0,
+                                totalTaxDeduction: 0,
+                                totalNetCommission: 0,
+                                totalPaymentsMade: 0, 
+                                dailySummaryCount: dailySnapshots.size,
+                                closedAt: Timestamp.now(),
+                                openingBalanceForMonth: 0, // Will be calculated
+                                closingBalanceForMonth: 0 // Will be calculated
+                            };
+
+                            dailySnapshots.forEach(docSnap => {
+                                const dailyData = docSnap.data();
+                                monthlySummaryData.totalGrossCommission += dailyData.totalGrossCommission || 0;
+                                monthlySummaryData.totalHeadOfficeDeduction += dailyData.headOfficeDeduction || 0;
+                                monthlySummaryData.totalTaxableAmount += dailyData.taxableAmount || 0;
+                                monthlySummaryData.totalTaxDeduction += dailyData.taxDeduction || 0;
+                                monthlySummaryData.totalNetCommission += dailyData.netCommission || 0;
+                            });
+
+                            const paymentsQuery = query(collection(db, getPaymentRequestsCollectionPath()), 
+                                where("status", "in", ["Approved", "Paid"])
+                            );
+                            const paymentSnapshots = await getDocs(paymentsQuery);
+                            paymentSnapshots.forEach(docSnap => {
+                                const prData = docSnap.data();
+                                const prApprovalMonthYear = prData.approvalDate ? getMonthYear(prData.approvalDate) : null;
+                                if (prApprovalMonthYear === monthYearToClose && (prData.approvedAmount || 0) > 0) {
+                                    monthlySummaryData.totalPaymentsMade += prData.approvedAmount;
+                                }
+                            });
+                            
+                            const prevMonth = getPreviousMonthYear(monthYearToClose);
+                            let calculatedOpeningBalance = 0;
+                            if (prevMonth) {
+                                const prevMonthSummarySnap = await getDoc(doc(db, getMonthlySummariesCollectionPath(), prevMonth));
+                                if (prevMonthSummarySnap.exists()) {
+                                    calculatedOpeningBalance = prevMonthSummarySnap.data().closingBalanceForMonth || 0;
+                                }
+                            } else {
+                                // For the very first month, try to derive from appState if it was the absolute beginning
+                                // This is an approximation. A more robust system might require explicit opening balance entry for the first month.
+                                const appStateSnap = await getDoc(doc(db, getAppStateDocPath()));
+                                if (appStateSnap.exists() && !appStateSnap.data().lastMonthClosed) { // if no month ever closed
+                                     // Opening balance for the very first month is current balance minus this month's earnings plus this month's payments
+                                     calculatedOpeningBalance = currentBalance - monthlySummaryData.totalNetCommission + monthlySummaryData.totalPaymentsMade;
+                                }
+                            }
+                            monthlySummaryData.openingBalanceForMonth = calculatedOpeningBalance;
+                            monthlySummaryData.closingBalanceForMonth = calculatedOpeningBalance + monthlySummaryData.totalNetCommission - monthlySummaryData.totalPaymentsMade;
+
+                            await setDoc(doc(db, getMonthlySummariesCollectionPath(), monthYearToClose), monthlySummaryData);
+                            await updateAppState({ lastMonthClosed: monthYearToClose });
+
+                            mcReportDiv.innerHTML = `
+                                <h4 class="text-lg font-semibold">Month Closure Summary for ${monthYearToClose}</h4>
+                                <p>Total Daily Records Processed: ${monthlySummaryData.dailySummaryCount}</p>
+                                <p>Total Gross Commission: ${formatCurrency(monthlySummaryData.totalGrossCommission)}</p>
+                                <p>Total Net Commission: ${formatCurrency(monthlySummaryData.totalNetCommission)}</p>
+                                <p>Total Payments (Approved this month): ${formatCurrency(monthlySummaryData.totalPaymentsMade)}</p>
+                                <p>Calculated Opening Balance for Month: ${formatCurrency(monthlySummaryData.openingBalanceForMonth)}</p>
+                                <p>Calculated Closing Balance for Month: ${formatCurrency(monthlySummaryData.closingBalanceForMonth)}</p>
+                                <p class="mt-2 text-green-600">Month ${monthYearToClose} summary generated and saved.</p>
+                            `;
+                            showToast(`Month ${monthYearToClose} closed successfully.`, "success");
+
+                        } catch (error) {
+                            console.error("Error during month closure:", error);
+                            mcReportDiv.innerHTML = `<p class="text-red-500">Error closing month: ${error.message}</p>`;
+                            showToast(`Error closing month: ${error.message}`, "error");
+                        }
+                    }
+                }]
+            );
+        };
+        
+        const getPreviousMonthYear = (monthYear) => { 
+            const [year, month] = monthYear.split('-').map(Number);
+            let prevYear = year;
+            let prevMonth = month - 1;
+            if (prevMonth === 0) {
+                prevMonth = 12;
+                prevYear--;
+            }
+            if (prevYear < 1900) return null; 
+            return `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+        };
+
+        // --- LOGIN & LOGOUT ---
+        const handleLogin = async (event) => {
+            event.preventDefault();
+            if(!usernameInput || !passwordInput) return;
+
+            const username = usernameInput.value;
+            const pass = passwordInput.value;
+
+            if (username === LOGIN_USERNAME && pass === LOGIN_PASSWORD) {
+                if(loginError) loginError.classList.add('hidden');
+                
+                const firebaseReady = await initializeFirebase();
+                if (firebaseReady && userId) { 
+                    if(loginSection) loginSection.classList.add('hidden');
+                    if(appSection) appSection.classList.remove('hidden');
+                    
+                    switchView('dashboard'); 
+
+                    if(mainHeaderTitleEl) mainHeaderTitleEl.textContent = APP_NAME;
+                    // The problematic line for 'mainHeaderSubtitle' is removed.
+                    // switchView handles setting the subtitle on currentViewTitle.
+                    if(footerDevInfoP) footerDevInfoP.textContent = DEVELOPER_INFO;
+
+                } else {
+                    if (loginError) { 
+                        if (!loginError.textContent || loginError.textContent.trim() === "") { // Check if already has a message from firebase init
+                            loginError.textContent = "Authentication with services failed. Please check your connection or configuration.";
+                        }
+                        loginError.classList.remove('hidden');
+                    } else {
+                        console.error("loginError element not found, but an auth error occurred.");
+                    }
+                }
+            } else {
+                if (loginError) { 
+                    loginError.textContent = "Invalid username or password.";
+                    loginError.classList.remove('hidden');
+                } else {
+                    console.error("loginError element not found, but an invalid login attempt occurred.");
+                }
+            }
+        };
+
+        const handleLogout = () => {
+            showModal(
+                'Confirm Logout',
+                'Are you sure you want to logout? Any unsaved data on the current screen might be lost.',
+                [{
+                    label: 'Logout',
+                    className: 'px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700',
+                    callback: () => {
+                        if(appSection) appSection.classList.add('hidden');
+                        if(loginSection) loginSection.classList.remove('hidden');
+                        currentView = 'login';
+                        if(usernameInput) usernameInput.value = '';
+                        if(passwordInput) passwordInput.value = '';
+                        if(loginError) loginError.classList.add('hidden');
+                    }
+                }]
+            );
+        };
+        
+        // --- SVG ICONS ---
+        const eyeIconSVG = () => `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>`;
+        const eyeSlashIconSVG = () => `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>`;
+
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Assign DOM elements
+            loginSection = document.getElementById('loginSection');
+            appSection = document.getElementById('appSection');
+            mainContent = document.getElementById('mainContent');
+            sidebar = document.getElementById('sidebar');
+            usernameInput = document.getElementById('username');
+            passwordInput = document.getElementById('password');
+            loginError = document.getElementById('loginError');
+            
+            currentViewTitle = document.getElementById('currentViewTitle');
+            currentDateDisplay = document.getElementById('currentDateDisplay');
+            mainHeaderTitleEl = document.getElementById('mainHeaderTitle');
+            footerDevInfoP = document.getElementById('footerDevInfo');  
+            loginDevInfoP = document.getElementById('loginDevInfo');    
+
+            if(loginDevInfoP) loginDevInfoP.textContent = DEVELOPER_INFO;
+
+
+            // Dashboard elements
+            stockNameInput = document.getElementById('stockName');
+            quantityInput = document.getElementById('quantity');
+            rateInput = document.getElementById('rate');
+            addEntryButton = document.getElementById('addEntryButton');
+            entriesTableBody = document.getElementById('entriesTableBody');
+            dailySummaryDiv = document.getElementById('dailySummaryDiv');
+            dashboardDateInput = document.getElementById('dashboardDateInput');
+            totalGrossCommissionEl = document.getElementById('totalGrossCommission');
+            headOfficeDeductionEl = document.getElementById('headOfficeDeduction');
+            taxableAmountEl = document.getElementById('taxableAmount');
+            taxDeductionEl = document.getElementById('taxDeduction');
+            netCommissionEl = document.getElementById('netCommission');
+            previousBalanceEl = document.getElementById('previousBalance');
+            currentDayNetCommissionEl = document.getElementById('currentDayNetCommission');
+            newBalanceEl = document.getElementById('newBalance');
+            saveDayButton = document.getElementById('saveDayButton');
+            printDayButton = document.getElementById('printDayButton'); 
+            balanceDisplayEl = document.getElementById('balanceDisplay');
+            toggleBalanceButton = document.getElementById('toggleBalanceButton');
+            
+            // Report elements
+            reportDateInput = document.getElementById('reportDateInput');
+            reportMonthInput = document.getElementById('reportMonthInput');
+            viewDateReportButton = document.getElementById('viewDateReportButton');
+            viewMonthReportButton = document.getElementById('viewMonthReportButton');
+            reportContentDiv = document.getElementById('reportContentDiv');
+            deleteReportButton = document.getElementById('deleteReportButton');
+
+            // Payment elements
+            prDateInput = document.getElementById('prDateInput');
+            prAmountInput = document.getElementById('prAmountInput');
+            prAddButton = document.getElementById('prAddButton');
+            prListDiv = document.getElementById('prListDiv');
+            
+            // Month Closure elements
+            mcMonthInput = document.getElementById('mcMonthInput');
+            mcCloseMonthButton = document.getElementById('mcCloseMonthButton');
+            mcReportDiv = document.getElementById('mcReportDiv');
+
+            // Modal elements
+            modal = document.getElementById('appModal');
+            modalCloseButton = document.getElementById('modalCloseButton');
+            modalTitle = document.getElementById('modalTitle');
+            modalBody = document.getElementById('modalBody');
+            modalActions = document.getElementById('modalActions');
+
+
+            // Event Listeners
+            const loginForm = document.getElementById('loginForm');
+            if(loginForm) loginForm.addEventListener('submit', handleLogin);
+            
+            const logoutBtn = document.getElementById('logoutButton');
+            if(logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+
+            if(sidebar) {
+                sidebar.querySelectorAll('a').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const viewName = link.getAttribute('data-view');
+                        if (viewName) switchView(viewName);
+                    });
+                });
+            }
+
+            if (addEntryButton) addEntryButton.addEventListener('click', handleAddEntry);
+            if (saveDayButton) saveDayButton.addEventListener('click', handleSaveDay);
+            
+            const reportPrintButton = document.getElementById('reportPrintButton');
+            if (reportPrintButton) reportPrintButton.addEventListener('click', handlePrintDay); 
+            if (printDayButton) printDayButton.addEventListener('click', handlePrintDay); 
+
+            if (dashboardDateInput) {
+                dashboardDateInput.value = selectedDate; 
+                dashboardDateInput.addEventListener('change', (e) => {
+                    selectedDate = e.target.value;
+                    loadDashboardData(); 
+                });
+            }
+            if (toggleBalanceButton) {
+                toggleBalanceButton.innerHTML = balanceVisible ? eyeIconSVG() : eyeSlashIconSVG();
+                toggleBalanceButton.addEventListener('click', toggleBalanceVisibility);
+            }
+            
+            if (viewDateReportButton) viewDateReportButton.addEventListener('click', viewDailyReport);
+            if (viewMonthReportButton) viewMonthReportButton.addEventListener('click', viewMonthlyReport);
+            if (deleteReportButton) deleteReportButton.addEventListener('click', handleDeleteReport);
+
+            if (prAddButton) prAddButton.addEventListener('click', handleAddPaymentRequest);
+            if (prDateInput) prDateInput.value = formatDate(new Date()); 
+
+            if (mcCloseMonthButton) mcCloseMonthButton.addEventListener('click', handleCloseMonth);
+            if (mcMonthInput) mcMonthInput.value = getMonthYear(new Date()); 
+
+            if(modalCloseButton) modalCloseButton.addEventListener('click', hideModal);
+            
+            // Set initial UI state
+            if(loginSection) loginSection.classList.remove('hidden');
+            if(appSection) appSection.classList.add('hidden');
+            if(modal) modal.classList.add('hidden'); 
+            const toastNotification = document.getElementById('toastNotification');
+            if(toastNotification) toastNotification.classList.add('hidden','opacity-0');
+        });
+
+    </script>
     <style>
-        /* CSS Variables for Theming */
-        :root {
-            /* Light Mode Defaults */
-            --bg-color: #f4f4f4;
-            --sidebar-bg: #2c3e50;
-            --sidebar-text: white;
-            --sidebar-hover-bg: #34495e;
-            --main-content-bg: #fff;
-            --header-text: #2c3e50;
-            --subheader-text: #7f8c8d;
-            --date-text: #555;
-            --border-color: #eee;
-            --table-header-bg: #f2f2f2;
-            --table-header-text: #333;
-            --table-border: #ddd;
-            --summary-bg: #f9f9f9;
-            --summary-border: #e0e0e0;
-            --summary-strong-text: #333;
-            --summary-span-text: #007bff;
-            --balance-text: #e67e22;
-            --input-border: #ccc;
-            --button-primary-bg: #007bff;
-            --button-primary-hover-bg: #0056b3;
-            --button-danger-bg: #dc3545;
-            --button-danger-hover-bg: #c82333;
-            --button-info-bg: #17a2b8;
-            --button-info-hover-bg: #138496;
-            --button-secondary-bg: #6c757d;
-            --button-secondary-hover-bg: #5a6268;
-            --developer-info-text: #bdc3c7;
-            --developer-info-link: #ecf0f1;
-            --section-header-text: #333;
-        }
-
-        /* Dark Mode */
-        body.dark-mode {
-            --bg-color: #1a1a2e;
-            --sidebar-bg: #16213e;
-            --sidebar-text: #e0e0e0;
-            --sidebar-hover-bg: #0f3460;
-            --main-content-bg: #0f3460;
-            --header-text: #e94560;
-            --subheader-text: #c0c0c0;
-            --date-text: #a0a0a0;
-            --border-color: #2e2e4a;
-            --table-header-bg: #22223b;
-            --table-header-text: #e0e0e0;
-            --table-border: #3b3b5c;
-            --summary-bg: #22223b;
-            --summary-border: #3b3b5c;
-            --summary-strong-text: #e0e0e0;
-            --summary-span-text: #53a9ff;
-            --balance-text: #ffc107;
-            --input-border: #5c5c7c;
-            --button-primary-bg: #53a9ff;
-            --button-primary-hover-bg: #3a8ee0;
-            --button-danger-bg: #e94560;
-            --button-danger-hover-bg: #d43a50;
-            --button-info-bg: #6c757d; /* Keep some neutral for info */
-            --button-info-hover-bg: #5a6268;
-            --button-secondary-bg: #3b3b5c;
-            --button-secondary-hover-bg: #2e2e4a;
-            --developer-info-text: #8888aa;
-            --developer-info-link: #a0a0a0;
-            --section-header-text: #e0e0e0;
-        }
-
-        /* General Styling */
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: var(--bg-color);
-            display: flex;
-            min-height: 100vh;
-            transition: background-color 0.3s ease;
-        }
-        #sidebar {
-            width: 220px;
-            background-color: var(--sidebar-bg);
-            color: var(--sidebar-text);
-            padding: 20px 0;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-            display: flex;
-            flex-direction: column;
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-        #sidebar h2 {
-            text-align: center;
-            margin-bottom: 30px;
-            color: var(--sidebar-text);
-        }
-        #sidebar ul {
-            list-style: none;
-            padding: 0;
-        }
-        #sidebar ul li {
-            margin-bottom: 10px;
-        }
-        #sidebar ul li a {
-            display: block;
-            padding: 12px 20px;
-            color: var(--sidebar-text);
-            text-decoration: none;
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-        #sidebar ul li a:hover, #sidebar ul li a.active {
-            background-color: var(--sidebar-hover-bg);
-        }
-        #main-content {
-            flex-grow: 1;
-            padding: 20px;
-            background-color: var(--main-content-bg);
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            margin: 20px;
-            border-radius: 8px;
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-        header {
-            text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 10px;
-        }
-        header h1 {
-            color: var(--header-text);
-            margin: 0;
-            font-size: 2em;
-        }
-        header h2 {
-            color: var(--subheader-text);
-            margin-top: 5px;
-            font-size: 1.2em;
-        }
-        .date-display {
-            text-align: right;
-            font-weight: bold;
-            color: var(--date-text);
-            margin-bottom: 20px;
-        }
-
-        /* Dashboard Specific Styling */
-        #dashboard-section {
-            display: block; /* Default view */
-        }
-        .dashboard-date-selection {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .dashboard-date-selection label {
-            font-weight: bold;
-            color: var(--section-header-text);
-        }
-        .dashboard-date-selection input[type="date"] {
-            padding: 8px;
-            border: 1px solid var(--input-border);
-            border-radius: 4px;
-            background-color: var(--main-content-bg);
-            color: var(--section-header-text);
-        }
-
-        .form-row {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 15px;
-            align-items: flex-end;
-        }
-        .form-row input[type="text"],
-        .form-row input[type="number"] {
-            padding: 10px;
-            border: 1px solid var(--input-border);
-            border-radius: 4px;
-            flex: 1;
-            min-width: 0; /* Allow shrinking */
-            background-color: var(--main-content-bg);
-            color: var(--section-header-text);
-        }
-        .form-row button {
-            padding: 10px 20px;
-            background-color: var(--button-primary-bg);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        .form-row button:hover {
-            background-color: var(--button-primary-hover-bg);
-        }
-        #transactions-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            color: var(--section-header-text);
-        }
-        #transactions-table th,
-        #transactions-table td {
-            border: 1px solid var(--table-border);
-            padding: 8px;
-            text-align: left;
-        }
-        #transactions-table th {
-            background-color: var(--table-header-bg);
-            color: var(--table-header-text);
-        }
-        .summary-section {
-            margin-top: 30px;
-            padding: 15px;
-            border: 1px solid var(--summary-border);
-            border-radius: 5px;
-            background-color: var(--summary-bg);
-            color: var(--section-header-text);
-        }
-        .summary-section div {
-            margin-bottom: 8px;
-            font-size: 1.1em;
-            display: flex;
-            justify-content: space-between;
-        }
-        .summary-section div strong {
-            color: var(--summary-strong-text);
-        }
-        .summary-section div span {
-            color: var(--summary-span-text);
-            font-weight: bold;
-        }
-        .balance-info {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: var(--balance-text);
-            margin-top: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between; /* To push toggle to the right */
-        }
-        .balance-amount {
-            display: inline-block; /* For hiding/showing */
-        }
-        .balance-toggle-btn {
-            background: none;
-            border: none;
-            font-size: 1.2em;
-            cursor: pointer;
-            color: var(--balance-text);
-            margin-left: 10px;
-        }
-        .balance-toggle-btn:hover {
-            color: var(--balance-text); /* Keep same color on hover for toggle */
-        }
-
-        .dashboard-buttons {
-            margin-top: 20px;
-            text-align: center;
-            display: flex; /* Use flex for button alignment */
-            justify-content: center; /* Center buttons horizontally */
-            flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
-            gap: 10px; /* Space between buttons */
-        }
-        .dashboard-buttons button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        #saveDayBtn {
-            background-color: var(--button-primary-bg);
-            color: white;
-        }
-        #saveDayBtn:hover {
-            background-color: var(--button-primary-hover-bg);
-        }
-        #clearEntriesBtn {
-            background-color: var(--button-danger-bg);
-            color: white;
-        }
-        #clearEntriesBtn:hover {
-            background-color: var(--button-danger-hover-bg);
-        }
-        #requestPaymentBtn {
-            background-color: var(--button-secondary-bg);
-            color: white;
-        }
-        #requestPaymentBtn:hover {
-            background-color: var(--button-secondary-hover-bg);
-        }
-        #printDailyBtn { /* New button style */
-            background-color: var(--button-info-bg);
-            color: white;
-        }
-        #printDailyBtn:hover {
-            background-color: var(--button-info-hover-bg);
-        }
-
-        /* Reports Section Styling */
-        #reports-section, #payment-history-section, #month-closure-section, #settings-section {
-            display: none; /* Hidden by default */
-            padding: 20px;
-            color: var(--section-header-text);
-        }
-        .report-controls {
-            margin-bottom: 20px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-        .report-controls input[type="date"],
-        .report-controls select,
-        .report-controls input[type="number"] { /* Added number input for year */
-            padding: 10px;
-            border: 1px solid var(--input-border);
-            border-radius: 4px;
-            flex: 1;
-            min-width: 0;
-            background-color: var(--main-content-bg);
-            color: var(--section-header-text);
-        }
-        .report-controls button {
-            padding: 10px 20px;
-            background-color: var(--button-primary-bg);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        .report-controls button:hover {
-            background-color: var(--button-primary-hover-bg);
-        }
-        #report-display {
-            border: 1px solid var(--table-border);
-            padding: 15px;
-            margin-top: 20px;
-            background-color: var(--main-content-bg);
-            max-height: 600px;
-            overflow-y: auto;
-        }
-        #report-display h3 {
-            text-align: center;
-            color: var(--section-header-text);
-            margin-bottom: 15px;
-        }
-        #report-display table {
-            width: 100%;
-            border-collapse: collapse;
-            color: var(--section-header-text);
-        }
-        #report-display th, #report-display td {
-            border: 1px solid var(--table-border);
-            padding: 8px;
-            text-align: left;
-            font-size: 0.9em;
-        }
-        #report-display th {
-            background-color: var(--table-header-bg);
-            color: var(--table-header-text);
-        }
-        .report-summary {
-            margin-top: 20px;
-            font-weight: bold;
-            text-align: right;
-            padding-top: 10px;
-            border-top: 1px dashed var(--border-color);
-        }
-        .report-summary span {
-            color: var(--summary-span-text);
-        }
-        .delete-report-section {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border-color);
-        }
-        .delete-report-section input[type="password"] {
-            padding: 10px;
-            border: 1px solid var(--input-border);
-            border-radius: 4px;
-            margin-right: 10px;
-            width: 200px;
-            background-color: var(--main-content-bg);
-            color: var(--section-header-text);
-        }
-        .delete-report-section button {
-            background-color: var(--button-danger-bg);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        .delete-report-section button:hover {
-            background-color: var(--button-danger-hover-bg);
-        }
-
-        /* Payment History Styling */
-        #payment-history-section h3 {
-            margin-bottom: 20px;
-        }
-        #payment-history-form {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        #payment-history-form input[type="date"],
-        #payment-history-form input[type="number"] {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid var(--input-border);
-            border-radius: 4px;
-            min-width: 120px; /* Ensure inputs don't get too small */
-            background-color: var(--main-content-bg);
-            color: var(--section-header-text);
-        }
-        #payment-history-form button {
-            padding: 10px 20px;
-            background-color: var(--button-primary-bg);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        #payment-history-form button:hover {
-            background-color: var(--button-primary-hover-bg);
-        }
-
-        #payment-history-display {
-            border: 1px solid var(--table-border);
-            padding: 15px;
-            margin-top: 20px;
-            background-color: var(--main-content-bg);
-            max-height: 500px;
-            overflow-y: auto;
-        }
-        #payment-history-display table {
-            width: 100%;
-            border-collapse: collapse;
-            color: var(--section-header-text);
-        }
-        #payment-history-display th, #payment-history-display td {
-            border: 1px solid var(--table-border);
-            padding: 8px;
-            text-align: left;
-            font-size: 0.9em;
-        }
-        #payment-history-display th {
-            background-color: var(--table-header-bg);
-            color: var(--table-header-text);
-        }
-
-        /* Month Closure Styling */
-        #month-closure-section {
-            text-align: center;
-        }
-        #month-closure-section h3 {
-            color: var(--section-header-text);
-            margin-bottom: 20px;
-        }
-        #month-closure-section button {
-            padding: 15px 30px;
-            background-color: #ffc107; /* Specific color for this button */
-            color: #333;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1.1em;
-            transition: background-color 0.3s ease;
-        }
-        #month-closure-section button:hover {
-            background-color: #e0a800;
-        }
-        #monthly-summary-display {
-            margin-top: 30px;
-            padding: 20px;
-            border: 1px solid var(--summary-border);
-            background-color: var(--summary-bg);
-            text-align: left;
-            max-height: 400px;
-            overflow-y: auto;
-            color: var(--section-header-text);
-        }
-        #monthly-summary-display h4 {
-            text-align: center;
-            color: var(--section-header-text);
-            margin-bottom: 15px;
-        }
-        #monthly-summary-display p {
-            margin-bottom: 10px;
-            font-size: 1.1em;
-        }
-        #monthly-summary-display strong {
-            color: var(--summary-span-text);
-        }
-
-        /* Settings Section Styling */
-        #settings-section {
-            padding: 20px;
-            color: var(--section-header-text);
-        }
-        #settings-section h3 {
-            color: var(--header-text);
-            margin-bottom: 20px;
-        }
-        .settings-group {
-            margin-bottom: 30px;
-            padding: 15px;
-            border: 1px solid var(--summary-border);
-            border-radius: 5px;
-            background-color: var(--summary-bg);
-        }
-        .settings-group h4 {
-            margin-top: 0;
-            color: var(--section-header-text);
-        }
-        .settings-group input[type="number"],
-        .settings-group input[type="password"] {
-            padding: 10px;
-            border: 1px solid var(--input-border);
-            border-radius: 4px;
-            width: 200px;
-            margin-right: 10px;
-            margin-bottom: 10px;
-            background-color: var(--main-content-bg);
-            color: var(--section-header-text);
-        }
-        .settings-group button {
-            padding: 10px 20px;
-            background-color: var(--button-primary-bg);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        .settings-group button:hover {
-            background-color: var(--button-primary-hover-bg);
-        }
-        #reset-password-group h4 {
-            color: var(--button-danger-bg);
-        }
-        #reset-password-group button {
-            background-color: var(--button-danger-bg);
-        }
-        #reset-password-group button:hover {
-            background-color: var(--button-danger-hover-bg);
-        }
-
-
-        /* Developer Info */
-        .developer-info {
-            text-align: center;
-            margin-top: auto; /* Pushes it to the bottom of the sidebar */
-            padding-top: 20px;
-            border-top: 1px solid var(--sidebar-hover-bg);
-            font-size: 0.8em;
-            color: var(--developer-info-text);
-        }
-        .developer-info a {
-            color: var(--developer-info-link);
-            text-decoration: none;
-        }
-        .developer-info a:hover {
-            text-decoration: underline;
-        }
-
-        /* Theme Toggle in Sidebar */
-        .theme-toggle-container {
-            margin-top: 20px;
-            padding: 10px 20px;
-            text-align: center;
-            border-top: 1px solid var(--sidebar-hover-bg);
-            padding-top: 20px;
-        }
-
-        .theme-toggle-container button {
-            background-color: #607d8b; /* A neutral grey for the toggle */
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.9em;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-            margin: 0 auto;
-            transition: background-color 0.3s ease;
-        }
-
-        .theme-toggle-container button:hover {
-            background-color: #546e7a;
-        }
-
-        /* Logout Button in Sidebar */
-        #logout-button {
-            background-color: #f44336; /* Red for logout */
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-top: 20px;
-            width: calc(100% - 40px); /* Adjust for padding */
-            margin-left: 20px;
-            margin-right: 20px;
-            transition: background-color 0.3s ease;
-        }
-        #logout-button:hover {
-            background-color: #d32f2f;
-        }
-
-        /* Login Page Styling */
-        #login-page {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: var(--bg-color);
-            z-index: 1000;
-            flex-direction: column;
-            transition: background-color 0.3s ease;
-        }
-
-        .login-container {
-            background-color: var(--main-content-bg);
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            text-align: center;
-            width: 300px;
-            transition: background-color 0.3s ease;
-        }
-
-        .login-container h2 {
-            color: var(--header-text);
-            margin-bottom: 25px;
-        }
-
-        .login-container input {
-            width: calc(100% - 20px);
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid var(--input-border);
-            border-radius: 4px;
-            background-color: var(--bg-color);
-            color: var(--section-header-text);
-        }
-
-        .login-container button {
-            width: 100%;
-            padding: 10px;
-            background-color: var(--button-primary-bg);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1.1em;
-            transition: background-color 0.3s ease;
-        }
-
-        .login-container button:hover {
-            background-color: var(--button-primary-hover-bg);
-        }
-
-        #login-error {
-            color: var(--button-danger-bg);
-            margin-top: 10px;
-            font-size: 0.9em;
-        }
-
-        /* Hide app content when login page is active */
-        #app-container {
-            display: flex; /* Keep flex for sidebar/main-content layout */
-            width: 100%;
-            height: 100%;
-        }
-        body.logged-out #app-container {
-            display: none;
-        }
-        body.logged-in #login-page {
-            display: none;
-        }
-
-
-        /* Print Specific Styling */
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-link { @apply block py-2.5 px-4 rounded transition duration-200; }
+        .sidebar-link:hover { @apply bg-gray-700 text-white; }
+        .sidebar-link.active { @apply bg-gray-900 text-white; } /* Note: Tailwind might prefer bg-gray-700 for active if sidebar is bg-gray-800 */
+        
+        /* Print specific styles */
         @media print {
             body {
-                display: block;
+                font-size: 10pt;
                 margin: 0;
                 padding: 0;
-                background-color: white;
+                background-color: white !important; /* Ensure white background for printing */
+                -webkit-print-color-adjust: exact; /* Chrome, Safari */
+                print-color-adjust: exact; /* Firefox, Edge */
             }
-            #sidebar, .form-row, .dashboard-buttons, .report-controls,
-            .delete-report-section, #requestPaymentBtn, #printDailyBtn, /* Hide print button itself */
-            #month-closure-section button, #payment-history-section h2, #payment-history-display button,
-            #payment-history-form, #settings-section, .dashboard-date-selection, /* Hide settings, payment form, dashboard date selector */
-            #login-page, #logout-button, .theme-toggle-container /* Hide login page, logout, theme toggle */
-            {
+            #loginSection, #sidebar, #appHeader, .print-hidden, #toastNotification, #appModal {
                 display: none !important;
             }
-            #main-content {
-                box-shadow: none;
-                margin: 0;
-                padding: 0;
-                border-radius: 0;
-                width: 100%;
+            #appSection, #mainContent, #mainContent > div[data-view] {
+                display: block !important;
+                width: 100% !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                background-color: white !important;
             }
-            header {
-                text-align: center;
-                margin-bottom: 15px;
-                border-bottom: 1px solid #ccc;
-                padding-bottom: 5px;
+            .printable-area, .print-this-section { 
+                display: block !important;
+                width: 100% !important;
+                margin: 0 auto;
+                padding: 5mm 10mm; /* Reduced padding for print */
+                border: none !important;
+                box-shadow: none !important;
+                page-break-inside: avoid;
+                background-color: white !important;
             }
-            header h1 {
-                font-size: 1.8em;
+             #view-dashboard.print-this-section { /* Specific for dashboard */
+                padding: 5mm; /* Minimal padding for dashboard print */
             }
-            header h2 {
-                font-size: 1em;
+            .print-header, .print-footer {
+                display: block !important; 
             }
-            .date-display {
-                text-align: right;
-                margin-bottom: 15px;
+            .report-table-container {
+                max-height: none !important; /* Allow table to expand */
+                overflow: visible !important;
             }
-            .summary-section, .balance-info, .report-summary {
-                border: none;
-                background-color: transparent;
-                padding: 0;
-                margin-top: 15px;
-                font-size: 0.9em; /* Smaller font for print */
-            }
-            .summary-section div {
-                margin-bottom: 4px; /* Less space between summary lines */
-            }
-            .balance-info {
-                display: block; /* Remove flex for print */
-                text-align: right;
-            }
-            .balance-info .balance-toggle-btn {
-                display: none !important; /* Hide toggle button in print */
-            }
-            #transactions-table, #report-display table, #payment-history-display table {
+            .report-table {
                 width: 100%;
                 border-collapse: collapse;
-                page-break-inside: avoid;
+                font-size: 9pt; /* Slightly smaller font for tables in print */
             }
-            #transactions-table th, #transactions-table td,
-            #report-display th, #report-display td,
-            #payment-history-display th, #payment-history-display td {
-                border: 1px solid #ddd;
-                padding: 5px;
-                font-size: 0.8em;
+            .report-table th, .report-table td {
+                border: 1px solid #ccc !important;
+                padding: 3px;
+                text-align: left;
             }
-            /* Adjust table for daily print to remove action column */
-            #transactions-table th:last-child,
-            #transactions-table td:last-child {
-                display: none;
+            .report-table th { 
+                background-color: #f0f0f0 !important; 
+                -webkit-print-color-adjust: exact; print-color-adjust: exact; 
+            }
+            .report-summary { 
+                background-color: #f9f9f9 !important; 
+                -webkit-print-color-adjust: exact; print-color-adjust: exact; 
+                margin-top: 10px; /* Add some space before summary */
+                padding: 10px;
+            }
+            .report-summary .grid {
+                font-size: 9pt;
             }
 
-            #report-display, #payment-history-display, #monthly-summary-display {
-                border: none;
-                padding: 0;
-                margin-top: 10px;
-                max-height: none;
-                overflow: visible;
+
+            @page {
+                size: A4; 
+                margin: 10mm; 
             }
-            .print-footer {
-                display: block;
-                text-align: center;
-                margin-top: 30px;
-                font-size: 0.9em;
-                color: #555;
+            
+            #view-dashboard .lg\:col-span-1, #view-dashboard .lg\:col-span-2 { /* Reset columns for print */
+                grid-column: span 3 / span 3 !important; 
             }
-            .print-footer a {
-                color: #555;
-                text-decoration: none;
+            #view-dashboard .lg\:grid-cols-3 {
+                 display: block !important; /* Stack elements for print */
+            }
+            #view-dashboard .bg-white.p-6.rounded-lg.shadow { /* Entry form and entries list container */
+                padding: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+                margin-bottom: 10px; /* Space between stacked sections */
+            }
+             #view-dashboard h3 { /* Reduce heading sizes for print */
+                font-size: 14pt;
+                margin-bottom: 5px;
+            }
+            #dailySummaryDiv h4 {
+                font-size: 12pt;
+                margin-bottom: 5px;
             }
         }
     </style>
 </head>
-<body>
-    <div id="login-page">
-        <div class="login-container">
-            <h2>Darson Securities Login</h2>
-            <input type="text" id="username-input" placeholder="Username">
-            <input type="password" id="password-input" placeholder="Password">
-            <button id="login-btn">Login</button>
-            <p id="login-error"></p>
-        </div>
-    </div>
+<body class="bg-gray-100">
 
-    <div id="app-container">
-        <div id="sidebar">
-            <h2>Darson Securities</h2>
-            <ul>
-                <li><a href="#" id="nav-dashboard" class="active">Dashboard</a></li>
-                <li><a href="#" id="nav-reports">Reports</a></li>
-                <li><a href="#" id="nav-payment-history">Payment History</a></li>
-                <li><a href="#" id="nav-month-closure">Month Closure</a></li>
-                <li><a href="#" id="nav-settings">Settings</a></li>
-            </ul>
-            <div class="theme-toggle-container">
-                <button id="theme-toggle-btn">Toggle Theme</button>
+    <section id="loginSection" class="min-h-screen flex items-center justify-center bg-gray-200">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+            <div class="text-center mb-6">
+                <h1 class="text-3xl font-bold text-gray-800">Darson Securities Limited</h1>
+                <p class="text-gray-600">Brokerage Commission Software</p>
             </div>
-            <button id="logout-button">Logout</button>
-            <div class="developer-info print-footer">
-                Developed by Afrasiab Asghar<br>
-                Visit <a href="http://www.Nextgensites.org" target="_blank">www.Nextgensites.org</a><br>
-                Contact +923060406003
-            </div>
+            <form id="loginForm">
+                <div class="mb-4">
+                    <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
+                    <input type="text" id="username" value="DARSON" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                </div>
+                <div class="mb-6">
+                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="password" value="AFRASIAB" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                </div>
+                <p id="loginError" class="text-red-500 text-sm mb-4 hidden"></p>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline transition duration-150">Login</button>
+            </form>
+            <p class="text-center text-xs text-gray-500 mt-8" id="loginDevInfo"></p>
         </div>
+    </section>
 
-        <div id="main-content">
-            <header>
-                <h1>Darson Securities Limited</h1>
-                <h2>Commission Report</h2>
-                <div class="date-display">Date: <span id="current-date"></span></div>
+    <section id="appSection" class="hidden h-screen flex">
+        <aside id="sidebar" class="w-64 bg-gray-800 text-white p-4 space-y-2 print-hidden">
+            <h2 class="text-2xl font-semibold mb-6 text-center">DSL</h2>
+            <nav>
+                <a href="#" data-view="dashboard" class="sidebar-link active">Dashboard</a>
+                <a href="#" data-view="dailyReports" class="sidebar-link">Daily Reports</a>
+                <a href="#" data-view="monthlyReports" class="sidebar-link">Monthly Reports</a>
+                <a href="#" data-view="paymentRequests" class="sidebar-link">Payment Requests</a>
+                <a href="#" data-view="monthClosure" class="sidebar-link">Month Closure</a>
+            </nav>
+            <div class="absolute bottom-4 left-4 right-4">
+                <button id="logoutButton" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md">Logout</button>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col overflow-hidden">
+            <header id="appHeader" class="bg-white shadow-md p-4 print-hidden">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 id="mainHeaderTitle" class="text-2xl font-bold text-gray-800"></h1>
+                        <p id="currentViewTitle" class="text-gray-600"></p>
+                    </div>
+                    <div class="text-right">
+                        <p id="currentDateDisplay" class="text-lg text-gray-700"></p>
+                        <div class="flex items-center justify-end mt-1">
+                            <span id="balanceDisplay" class="text-indigo-600 font-semibold mr-2">PKR ******</span>
+                            <button id="toggleBalanceButton" class="text-gray-500 hover:text-gray-700"></button>
+                        </div>
+                    </div>
+                </div>
             </header>
 
-            <section id="dashboard-section">
-                <h3>Daily Commission Entry</h3>
-                <div class="dashboard-date-selection">
-                    <label for="dashboard-date-selector">Select Date:</label>
-                    <input type="date" id="dashboard-date-selector">
-                </div>
-                <div class="form-row">
-                    <input type="text" id="stock-name" placeholder="Stock Name">
-                    <input type="number" id="stock-quantity" placeholder="Quantity" min="1">
-                    <input type="number" id="stock-rate" placeholder="Rate (PKR)" step="0.01" min="0.01">
-                    <input type="number" id="commission-per-stock" placeholder="Comm. per Stock (PKR)" step="0.01" readonly>
-                    <input type="number" id="total-commission-per-stock" placeholder="Total Comm. (PKR)" step="0.01" readonly>
-                    <button id="add-entry-btn">Add Entry</button>
-                </div>
+            <div id="mainContent" class="flex-1 p-6 overflow-y-auto bg-gray-50">
+                <div id="view-dashboard" data-view="dashboard" class="print-this-section">
+                     <div class="print-header text-center mb-4 hidden"> <h2 class="text-2xl font-bold">${APP_NAME}</h2>
+                        <p class="text-lg">${APP_SUBTITLE}</p>
+                        <p class="text-md dashboard-print-date">Date: </p> </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow print-hidden"> <h3 class="text-xl font-semibold mb-4">Add Stock Entry</h3>
+                            <div class="mb-4">
+                                <label for="dashboardDateInput" class="block text-sm font-medium text-gray-700">Date</label>
+                                <input type="date" id="dashboardDateInput" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                            <div class="mb-3">
+                                <label for="stockName" class="block text-sm font-medium text-gray-700">Stock Name</label>
+                                <input type="text" id="stockName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                            <div class="mb-3">
+                                <label for="quantity" class="block text-sm font-medium text-gray-700">Quantity</label>
+                                <input type="number" id="quantity" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                            <div class="mb-4">
+                                <label for="rate" class="block text-sm font-medium text-gray-700">Rate (PKR)</label>
+                                <input type="number" step="0.01" id="rate" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                            <button id="addEntryButton" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md">Add Entry</button>
+                        </div>
 
-                <table id="transactions-table">
-                    <thead>
-                        <tr>
-                            <th>Stock Name</th>
-                            <th>Quantity</th>
-                            <th>Rate (PKR)</th>
-                            <th>Comm. per Stock (PKR)</th>
-                            <th>Total Comm. (PKR)</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="transactions-body">
-                        </tbody>
-                </table>
-
-                <div class="summary-section">
-                    <div><strong>Gross Commission:</strong> <span id="gross-commission-display">0.00 PKR</span></div>
-                    <div><strong>Head Office Deduction (40%):</strong> <span id="ho-deduction-display">0.00 PKR</span></div>
-                    <div><strong>Remaining Commission:</strong> <span id="remaining-commission-display">0.00 PKR</span></div>
-                    <div><strong>Tax Deduction (12%):</strong> <span id="tax-deduction-display">0.00 PKR</span></div>
-                    <div><strong>Net Commission:</strong> <span id="net-commission-display">0.00 PKR</span></div>
-                </div>
-
-                <div class="balance-info">
-                    <div>
-                        Previous Balance: <span class="balance-amount" id="previous-balance-display">0.00 PKR</span><br>
-                        Current Balance: <span class="balance-amount" id="current-balance-display">0.00 PKR</span>
+                        <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-xl font-semibold mb-4">Today's Entries</h3>
+                            <div class="overflow-x-auto mb-4 max-h-96 report-table-container">
+                                <table class="w-full text-sm text-left text-gray-500 border-collapse border border-gray-300 report-table">
+                                    <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-2 border">#</th>
+                                            <th scope="col" class="px-4 py-2 border">Stock</th>
+                                            <th scope="col" class="px-4 py-2 border text-right">Qty</th>
+                                            <th scope="col" class="px-4 py-2 border text-right">Rate</th>
+                                            <th scope="col" class="px-4 py-2 border text-right">Comm/Share</th>
+                                            <th scope="col" class="px-4 py-2 border text-right">Total Comm.</th>
+                                            <th scope="col" class="px-4 py-2 border print-hidden">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="entriesTableBody">
+                                        <tr><td colspan="7" class="text-center py-4">No entries added yet.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div id="dailySummaryDiv" class="mt-6 p-4 border border-gray-200 rounded-md bg-gray-50 report-summary">
+                                <h4 class="font-semibold text-lg mb-3">Daily Commission Summary</h4>
+                                <div class="space-y-1 text-sm">
+                                    <div class="flex justify-between"><span class="text-gray-600">Total Gross Commission:</span> <span id="totalGrossCommission" class="font-medium">PKR 0.00</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-600">Head Office (40%):</span> <span id="headOfficeDeduction" class="font-medium text-red-500">PKR 0.00</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-600">Amount Before Tax:</span> <span id="taxableAmount" class="font-medium">PKR 0.00</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-600">Tax (12% on Rem.):</span> <span id="taxDeduction" class="font-medium text-red-500">PKR 0.00</span></div>
+                                    <hr class="my-2">
+                                    <div class="flex justify-between text-base"><span class="font-semibold">Net Commission for Day:</span> <span id="netCommission" class="font-bold text-green-600">PKR 0.00</span></div>
+                                    <hr class="my-2">
+                                    <div class="flex justify-between print-hidden"><span class="text-gray-600">Previous Balance:</span> <span id="previousBalance" class="font-medium">PKR 0.00</span></div>
+                                    <div class="flex justify-between print-hidden"><span class="text-gray-600">Today's Net Commission:</span> <span id="currentDayNetCommission" class="font-medium text-green-500">PKR 0.00</span></div>
+                                    <div class="flex justify-between text-lg print-hidden"><span class="font-semibold text-blue-600">New Estimated Balance:</span> <span id="newBalance" class="font-bold text-blue-700">PKR 0.00</span></div>
+                                </div>
+                            </div>
+                            <div class="mt-6 flex space-x-3 print-hidden">
+                                <button id="saveDayButton" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md">Save Day</button>
+                                <button id="printDayButton" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md">Print View</button>
+                            </div>
+                        </div>
                     </div>
-                    <button class="balance-toggle-btn" id="toggle-balance-btn">👁️</button>
-                </div>
+                     <div class="mt-8 text-xs text-gray-500 print-footer hidden">${DEVELOPER_INFO}</div> </div>
 
-                <div class="dashboard-buttons">
-                    <button id="saveDayBtn">Save Day Data</button>
-                    <button id="clearEntriesBtn">Clear Current Entries</button>
-                    <button id="requestPaymentBtn">Request Payment</button>
-                    <button id="printDailyBtn">Print Daily Transactions</button>
+                <div id="view-dailyReports" data-view="dailyReports" class="hidden">
+                    <h3 class="text-xl font-semibold mb-4">Daily Reports</h3>
+                    <div class="bg-white p-6 rounded-lg shadow mb-6 print-hidden">
+                        <div class="flex flex-wrap items-end gap-4">
+                            <div>
+                                <label for="reportDateInput" class="block text-sm font-medium text-gray-700">Select Date</label>
+                                <input type="date" id="reportDateInput" class="mt-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <button id="viewDateReportButton" class="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold py-2 px-4 rounded-md">View Daily Report</button>
+                        </div>
+                    </div>
+                    <div id="reportActionsTop" class="my-4 flex justify-end space-x-2 print-hidden">
+                         <button id="reportPrintButton" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md">Print Report</button>
+                         <button id="deleteReportButton" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md hidden">Delete Report</button>
+                    </div>
+                    <div id="reportContentDiv" class="bg-white p-2 md:p-6 rounded-lg shadow"> <p class="text-gray-500">Select date to view report.</p>
+                    </div>
                 </div>
-            </section>
-
-            <section id="reports-section">
-                <h3>View Reports</h3>
-                <div class="report-controls">
-                    <label for="report-start-date">Start Date:</label>
-                    <input type="date" id="report-start-date">
-                    <label for="report-end-date">End Date:</label>
-                    <input type="date" id="report-end-date">
-                    <button id="view-date-range-report-btn">View Date Range Report</button>
-                </div>
-                <div class="report-controls">
-                    <input type="date" id="report-date-selector">
-                    <select id="report-month-selector">
-                        <option value="">Select Month</option>
-                        <option value="01">January</option>
-                        <option value="02">February</option>
-                        <option value="03">March</option>
-                        <option value="04">April</option>
-                        <option value="05">May</option>
-                        <option value="06">June</option>
-                        <option value="07">July</option>
-                        <option value="08">August</option>
-                        <option value="09">September</option>
-                        <option value="10">October</option>
-                        <option value="11">November</option>
-                        <option value="12">December</option>
-                    </select>
-                    <input type="number" id="report-year-selector" placeholder="Year (e.g., 2023)" min="2000" max="2100">
-                    <button id="view-single-report-btn">View Daily/Monthly Report</button>
-                    <button id="print-report-btn">Print Report</button>
-                </div>
-                <div id="report-display">
+                <div id="view-monthlyReports" data-view="monthlyReports" class="hidden">
+                     <h3 class="text-xl font-semibold mb-4">Monthly Reports</h3>
+                     <div class="bg-white p-6 rounded-lg shadow mb-6 print-hidden">
+                        <div class="flex flex-wrap items-end gap-4">
+                            <div>
+                                <label for="reportMonthInput" class="block text-sm font-medium text-gray-700">Select Month</label>
+                                <input type="month" id="reportMonthInput" class="mt-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <button id="viewMonthReportButton" class="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded-md">View Monthly Report</button>
+                        </div>
+                    </div>
                     </div>
 
-                <div class="delete-report-section">
-                    <h4>Delete Report (Password Protected)</h4>
-                    <input type="password" id="delete-password" placeholder="Enter Password">
-                    <button id="delete-report-btn">Delete Selected Report</button>
-                </div>
-            </section>
 
-            <section id="payment-history-section">
-                <h3>Payment History</h3>
-                <div id="payment-history-form">
-                    <h4>Add/Update Payment Record</h4>
-                    <input type="date" id="payment-date-input" required>
-                    <input type="number" id="payment-requested-input" placeholder="Requested Amount (PKR)" step="0.01" min="0">
-                    <input type="number" id="payment-approved-input" placeholder="Approved Amount (PKR)" step="0.01" min="0">
-                    <input type="number" id="payment-paid-input" placeholder="Paid Amount (PKR)" step="0.01" min="0">
-                    <button id="add-payment-record-btn">Add/Update Payment</button>
-                </div>
-                <div id="payment-history-display">
-                    <table id="payment-history-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Requested (PKR)</th>
-                                <th>Approved (PKR)</th>
-                                <th>Paid (PKR)</th>
-                                <th>Balance Before (PKR)</th>
-                                <th>Balance After (PKR)</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="payment-history-body">
-                            </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <section id="month-closure-section">
-                <h3>Month Closure</h3>
-                <p>Generate a summary for the selected month.</p>
-                <div class="report-controls">
-                    <select id="close-month-selector">
-                        <option value="">Select Month</option>
-                        <option value="01">January</option>
-                        <option value="02">February</option>
-                        <option value="03">March</option>
-                        <option value="04">April</option>
-                        <option value="05">May</option>
-                        <option value="06">June</option>
-                        <option value="07">July</option>
-                        <option value="08">August</option>
-                        <option value="09">September</option>
-                        <option value="10">October</option>
-                        <option value="11">November</option>
-                        <option value="12">December</option>
-                    </select>
-                    <input type="number" id="close-year-selector" placeholder="Year (e.g., 2023)" min="2000" max="2100">
-                    <button id="generate-monthly-summary-btn">Generate Monthly Summary</button>
-                </div>
-                <div id="monthly-summary-display">
+                <div id="view-paymentRequests" data-view="paymentRequests" class="hidden">
+                    <h3 class="text-xl font-semibold mb-4">Payment Requests</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="md:col-span-1 bg-white p-6 rounded-lg shadow">
+                            <h4 class="text-lg font-medium mb-3">New Payment Request</h4>
+                            <div class="mb-3">
+                                <label for="prDateInput" class="block text-sm font-medium text-gray-700">Request Date</label>
+                                <input type="date" id="prDateInput" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
+                            </div>
+                            <div class="mb-4">
+                                <label for="prAmountInput" class="block text-sm font-medium text-gray-700">Requested Amount (PKR)</label>
+                                <input type="number" step="0.01" id="prAmountInput" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
+                            </div>
+                            <button id="prAddButton" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md">Add Request</button>
+                        </div>
+                        <div class="md:col-span-2 bg-white p-6 rounded-lg shadow">
+                            <h4 class="text-lg font-medium mb-3">Existing Requests</h4>
+                            <div id="prListDiv" class="max-h-[60vh] overflow-y-auto">
+                                <p class="text-gray-500">Loading payment requests...</p>
+                            </div>
+                        </div>
                     </div>
-            </section>
-
-            <section id="settings-section">
-                <h3>Settings</h3>
-                <div class="settings-group">
-                    <h4>Set Overall Previous Balance Manually (Password Protected)</h4>
-                    <p>This will set the global accumulated balance to the value you enter. Use with caution.</p>
-                    <input type="number" id="manual-previous-balance" placeholder="Enter new balance (PKR)" step="0.01">
-                    <input type="password" id="settings-password" placeholder="Enter Password">
-                    <button id="save-manual-balance-btn">Save Manual Balance</button>
                 </div>
-                <div class="settings-group" id="reset-password-group">
-                    <h4>Reset All Software Data (Password Protected)</h4>
-                    <p>This action will permanently delete ALL stored commission data, payment history, and balances. This cannot be undone.</p>
-                    <input type="password" id="reset-password" placeholder="Enter Password to Reset">
-                    <button id="confirm-reset-btn">Confirm Reset</button>
-                </div>
-            </section>
 
-            <div class="print-footer" style="display: none;">
-                Developed by Afrasiab Asghar | www.Nextgensites.org | Contact +923060406003
+                <div id="view-monthClosure" data-view="monthClosure" class="hidden">
+                    <h3 class="text-xl font-semibold mb-4">Month Closure</h3>
+                     <div class="bg-white p-6 rounded-lg shadow mb-6">
+                        <div class="flex flex-wrap items-end gap-4">
+                            <div>
+                                <label for="mcMonthInput" class="block text-sm font-medium text-gray-700">Select Month to Close</label>
+                                <input type="month" id="mcMonthInput" class="mt-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                            </div>
+                            <button id="mcCloseMonthButton" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md">Generate & Close Month Summary</button>
+                        </div>
+                    </div>
+                    <div id="mcReportDiv" class="bg-white p-6 rounded-lg shadow"> <p class="text-gray-500">Select month to generate summary.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <footer class="bg-white border-t p-4 text-center text-sm text-gray-600 print-hidden">
+                <p id="footerDevInfo"></p>
+            </footer>
+        </main>
+    </section>
+
+    <div id="appModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center print-hidden hidden z-50">
+        <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 id="modalTitle" class="text-lg leading-6 font-medium text-gray-900">Modal Title</h3>
+                <div id="modalBody" class="mt-2 px-7 py-3 text-sm text-gray-500">
+                    </div>
+                <div id="modalActions" class="items-center px-4 py-3 space-x-2">
+                    </div>
+                 <button id="modalCloseButton" class="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
             </div>
         </div>
     </div>
 
-    <script>
-        const AUTH_USERNAME = "DARSON";
-        const AUTH_PASSWORD = "AFRASIAB";
+    <div id="toastNotification" class="fixed bottom-5 right-5 px-4 py-3 rounded-md text-white shadow-lg transition-opacity duration-300 ease-in-out hidden z-50 print-hidden">
+        <p id="toastMessage">Toast message!</p>
+    </div>
 
-        // Local Storage Keys
-        const LOCAL_STORAGE_PREFIX = "darson_securities_";
-        const DAILY_COMMISSION_KEY_PREFIX = LOCAL_STORAGE_PREFIX + "daily_commissions_";
-        const PAYMENT_HISTORY_KEY = LOCAL_STORAGE_PREFIX + "payment_history";
-        const CURRENT_BALANCE_KEY = LOCAL_STORAGE_PREFIX + "current_balance";
-        const MONTHLY_SUMMARY_KEY_PREFIX = LOCAL_STORAGE_PREFIX + "monthly_summary_";
-        const THEME_PREFERENCE_KEY = LOCAL_STORAGE_PREFIX + "theme_preference";
-
-        let currentTransactions = [];
-        let previousBalance = 0;
-        let currentBalance = 0;
-        let balanceHidden = false;
-
-        // DOM Elements - Login Page
-        const loginPage = document.getElementById('login-page');
-        const usernameInput = document.getElementById('username-input');
-        const passwordInput = document.getElementById('password-input');
-        const loginBtn = document.getElementById('login-btn');
-        const loginError = document.getElementById('login-error');
-        const appContainer = document.getElementById('app-container');
-
-        // DOM Elements - Sidebar & Theme
-        const themeToggleBtn = document.getElementById('theme-toggle-btn');
-        const logoutButton = document.getElementById('logout-button');
-
-        // DOM Elements - Main Content (existing)
-        const currentDateSpan = document.getElementById('current-date');
-        const dashboardDateSelector = document.getElementById('dashboard-date-selector');
-        const stockNameInput = document.getElementById('stock-name');
-        const stockQuantityInput = document.getElementById('stock-quantity');
-        const stockRateInput = document.getElementById('stock-rate');
-        const commissionPerStockInput = document.getElementById('commission-per-stock');
-        const totalCommissionPerStockInput = document.getElementById('total-commission-per-stock');
-        const addEntryBtn = document.getElementById('add-entry-btn');
-        const transactionsBody = document.getElementById('transactions-body');
-        const grossCommissionDisplay = document.getElementById('gross-commission-display');
-        const hoDeductionDisplay = document.getElementById('ho-deduction-display');
-        const remainingCommissionDisplay = document.getElementById('remaining-commission-display');
-        const taxDeductionDisplay = document.getElementById('tax-deduction-display');
-        const netCommissionDisplay = document.getElementById('net-commission-display');
-        const previousBalanceDisplay = document.getElementById('previous-balance-display');
-        const currentBalanceDisplay = document.getElementById('current-balance-display');
-        const saveDayBtn = document.getElementById('saveDayBtn');
-        const clearEntriesBtn = document.getElementById('clearEntriesBtn');
-        const requestPaymentBtn = document.getElementById('requestPaymentBtn');
-        const printDailyBtn = document.getElementById('printDailyBtn');
-        const toggleBalanceBtn = document.getElementById('toggle-balance-btn');
-
-        const navDashboard = document.getElementById('nav-dashboard');
-        const navReports = document.getElementById('nav-reports');
-        const navPaymentHistory = document.getElementById('nav-payment-history');
-        const navMonthClosure = document.getElementById('nav-month-closure');
-        const navSettings = document.getElementById('nav-settings');
-
-        const dashboardSection = document.getElementById('dashboard-section');
-        const reportsSection = document.getElementById('reports-section');
-        const paymentHistorySection = document.getElementById('payment-history-section');
-        const monthClosureSection = document.getElementById('month-closure-section');
-        const settingsSection = document.getElementById('settings-section');
-
-        const reportStartDateSelector = document.getElementById('report-start-date');
-        const reportEndDateSelector = document.getElementById('report-end-date');
-        const viewDateRangeReportBtn = document.getElementById('view-date-range-report-btn');
-
-        const reportDateSelector = document.getElementById('report-date-selector');
-        const reportMonthSelector = document.getElementById('report-month-selector');
-        const reportYearSelector = document.getElementById('report-year-selector');
-        const viewSingleReportBtn = document.getElementById('view-single-report-btn');
-        const printReportBtn = document.getElementById('print-report-btn');
-        const reportDisplay = document.getElementById('report-display');
-        const deletePasswordInput = document.getElementById('delete-password');
-        const deleteReportBtn = document.getElementById('delete-report-btn');
-
-        const paymentDateInput = document.getElementById('payment-date-input');
-        const paymentRequestedInput = document.getElementById('payment-requested-input');
-        const paymentApprovedInput = document.getElementById('payment-approved-input');
-        const paymentPaidInput = document.getElementById('payment-paid-input');
-        const addPaymentRecordBtn = document.getElementById('add-payment-record-btn');
-        const paymentHistoryBody = document.getElementById('payment-history-body');
-
-        const closeMonthSelector = document.getElementById('close-month-selector');
-        const closeYearSelector = document.getElementById('close-year-selector');
-        const generateMonthlySummaryBtn = document.getElementById('generate-monthly-summary-btn');
-        const monthlySummaryDisplay = document.getElementById('monthly-summary-display');
-
-        const manualPreviousBalanceInput = document.getElementById('manual-previous-balance');
-        const settingsPasswordInput = document.getElementById('settings-password');
-        const saveManualBalanceBtn = document.getElementById('save-manual-balance-btn');
-
-        const resetPasswordInput = document.getElementById('reset-password');
-        const confirmResetBtn = document.getElementById('confirm-reset-btn');
-
-
-        // Helper Functions
-        /**
-         * Formats a Date object into a YYYY-MM-DD string.
-         * @param {Date} date - The date object to format.
-         * @returns {string} The formatted date string.
-         */
-        function formatDate(date) {
-            const d = new Date(date);
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-
-        /**
-         * Formats a number as currency in PKR.
-         * @param {number} amount - The amount to format.
-         * @returns {string} The formatted currency string.
-         */
-        function formatCurrency(amount) {
-            if (balanceHidden) {
-                return '****** PKR'; // Return masked value if hidden
-            }
-            return `${amount.toFixed(2)} PKR`;
-        }
-
-        /**
-         * Determines the commission rate based on the stock rate.
-         * @param {number} rate - The stock rate.
-         * @returns {number} The commission rate (fixed amount or percentage as decimal).
-         */
-        function getCommissionRate(rate) {
-            if (rate >= 0.01 && rate <= 3.00) return 0.03;
-            if (rate >= 3.01 && rate <= 20.00) return 0.07;
-            if (rate >= 20.01 && rate <= 40.00) return 0.09;
-            if (rate >= 40.01 && rate <= 50.00) return 0.12;
-            if (rate >= 50.01 && rate <= 90.00) return 0.14;
-            if (rate >= 90.01 && rate <= 100.00) return 0.17;
-            if (rate > 100.00) return 0.0017; // 0.17% as a decimal
-            return 0;
-        }
-
-        /**
-         * Calculates commission per stock and total commission for a given quantity and rate.
-         * @param {number} quantity - The quantity of stocks.
-         * @param {number} rate - The rate per stock.
-         * @returns {{commissionPerStock: number, totalCommission: number}} An object containing calculated commissions.
-         */
-        function calculateCommission(quantity, rate) {
-            const commissionRate = getCommissionRate(rate);
-            let commissionPerStock;
-
-            if (rate > 100.00) {
-                // For rates above 100, commission is 0.17% of transaction value per stock
-                commissionPerStock = (rate * commissionRate);
-            } else {
-                // For rates up to 100, commission is a fixed amount per stock
-                commissionPerStock = commissionRate;
-            }
-
-            const totalCommission = commissionPerStock * quantity;
-            return {
-                commissionPerStock: commissionPerStock,
-                totalCommission: totalCommission
-            };
-        }
-
-        /**
-         * Calculates deductions (Head Office and Tax) from the gross commission.
-         * @param {number} grossCommission - The total gross commission.
-         * @returns {{hoDeduction: number, remainingCommission: number, taxDeduction: number, netCommission: number}} An object containing calculated deductions and net commission.
-         */
-        function calculateDeductions(grossCommission) {
-            const hoDeduction = grossCommission * 0.40; // 40% for head office
-            const remainingCommission = grossCommission - hoDeduction;
-            const taxDeduction = remainingCommission * 0.12; // 12% tax on remaining 60%
-            const netCommission = remainingCommission - taxDeduction;
-            return { hoDeduction, remainingCommission, taxDeduction, netCommission };
-        }
-
-        /**
-         * Updates the summary display on the dashboard based on current transactions.
-         * Also updates the current balance.
-         */
-        function updateSummary() {
-            let totalGrossCommission = currentTransactions.reduce((sum, t) => sum + t.totalCommission, 0);
-            const { hoDeduction, remainingCommission, taxDeduction, netCommission } = calculateDeductions(totalGrossCommission);
-
-            grossCommissionDisplay.textContent = formatCurrency(totalGrossCommission);
-            hoDeductionDisplay.textContent = formatCurrency(hoDeduction);
-            remainingCommissionDisplay.textContent = formatCurrency(remainingCommission);
-            taxDeductionDisplay.textContent = formatCurrency(taxDeduction);
-            netCommissionDisplay.textContent = formatCurrency(netCommission);
-
-            updateDashboardBalances(); // Update dashboard previous/current balance display
-        }
-
-        /**
-         * Renders the current transactions in the dashboard table.
-         */
-        function renderTransactions() {
-            transactionsBody.innerHTML = '';
-            if (currentTransactions.length === 0) {
-                transactionsBody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No entries for today.</td></tr>';
-            }
-            currentTransactions.forEach((transaction, index) => {
-                const row = transactionsBody.insertRow();
-                row.innerHTML = `
-                    <td>${transaction.stockName}</td>
-                    <td>${transaction.quantity}</td>
-                    <td>${formatCurrency(transaction.rate)}</td>
-                    <td>${formatCurrency(transaction.commissionPerStock)}</td>
-                    <td>${formatCurrency(transaction.totalCommission)}</td>
-                    <td><button data-index="${index}" class="delete-transaction-btn">Delete</button></td>
-                `;
-            });
-            document.querySelectorAll('.delete-transaction-btn').forEach(button => {
-                button.onclick = deleteTransaction;
-            });
-            updateSummary(); // Call updateSummary to refresh balances after rendering
-        }
-
-        /**
-         * Loads daily transactions for a specific date from local storage.
-         * @param {string} date - The date in YYYY-MM-DD format.
-         */
-        function loadDailyTransactions(date) {
-            const data = localStorage.getItem(DAILY_COMMISSION_KEY_PREFIX + date);
-            if (data) {
-                currentTransactions = JSON.parse(data);
-            } else {
-                currentTransactions = [];
-            }
-            renderTransactions();
-        }
-
-        /**
-         * Saves the current day's transactions and updates the global running balance in local storage.
-         * @param {string} date - The current date in YYYY-MM-DD format.
-         */
-        function saveDailyTransactions(date) {
-            const oldDailyData = localStorage.getItem(DAILY_COMMISSION_KEY_PREFIX + date);
-            const oldTransactionsForDay = oldDailyData ? JSON.parse(oldDailyData) : [];
-            const oldNetCommissionForDay = calculateDeductions(oldTransactionsForDay.reduce((sum, t) => sum + t.totalCommission, 0)).netCommission;
-
-            const newNetCommissionForDay = calculateDeductions(currentTransactions.reduce((sum, t) => sum + t.totalCommission, 0)).netCommission;
-
-            const netChangeInCommission = newNetCommissionForDay - oldNetCommissionForDay;
-
-            // Update the global accumulated balance in localStorage
-            let globalAccumulatedBalance = parseFloat(localStorage.getItem(CURRENT_BALANCE_KEY) || 0);
-            globalAccumulatedBalance += netChangeInCommission;
-            localStorage.setItem(CURRENT_BALANCE_KEY, globalAccumulatedBalance.toFixed(2));
-
-            // Save the current day's transactions
-            localStorage.setItem(DAILY_COMMISSION_KEY_PREFIX + date, JSON.stringify(currentTransactions));
-
-            // Re-calculate and update dashboard balances for the current view
-            updateDashboardBalances();
-        }
-
-        /**
-         * Ensures the CURRENT_BALANCE_KEY exists in localStorage, initializing if not.
-         * This function does NOT update the dashboard display variables (previousBalance, currentBalance).
-         */
-        function ensureGlobalBalanceExists() {
-            if (localStorage.getItem(CURRENT_BALANCE_KEY) === null) {
-                localStorage.setItem(CURRENT_BALANCE_KEY, '0.00');
-            }
-        }
-
-        /**
-         * Adds a payment record to the payment history in local storage.
-         * This function now handles requested, approved, and paid amounts.
-         * @param {object} payment - The payment object.
-         * @param {string} payment.date - Date of the payment.
-         * @param {number} payment.requested - Requested amount.
-         * @param {number} payment.approved - Approved amount.
-         * @param {number} payment.paid - Paid amount.
-         * @param {number} payment.balanceBefore - Balance before this payment was applied.
-         * @param {number} payment.balanceAfter - Balance after this payment was applied.
-         */
-        function addPaymentRecord(payment) {
-            const payments = JSON.parse(localStorage.getItem(PAYMENT_HISTORY_KEY) || '[]');
-            // Check if an entry for the same date exists and update it, otherwise add new
-            const existingIndex = payments.findIndex(p => p.date === payment.date);
-            if (existingIndex > -1) {
-                payments[existingIndex] = payment;
-            } else {
-                payments.push(payment);
-            }
-            localStorage.setItem(PAYMENT_HISTORY_KEY, JSON.stringify(payments));
-            renderPaymentHistory();
-        }
-
-        /**
-         * Renders the payment history table.
-         */
-        function renderPaymentHistory() {
-            const payments = JSON.parse(localStorage.getItem(PAYMENT_HISTORY_KEY) || '[]');
-            paymentHistoryBody.innerHTML = '';
-            if (payments.length === 0) {
-                paymentHistoryBody.innerHTML = '<tr><td colspan="7">No payment history found.</td></tr>';
-                return;
-            }
-            payments.forEach((payment, index) => {
-                const row = paymentHistoryBody.insertRow();
-                row.innerHTML = `
-                    <td>${payment.date}</td>
-                    <td>${formatCurrency(payment.requested)}</td>
-                    <td>${formatCurrency(payment.approved)}</td>
-                    <td>${formatCurrency(payment.paid)}</td>
-                    <td>${formatCurrency(payment.balanceBefore)}</td>
-                    <td>${formatCurrency(payment.balanceAfter)}</td>
-                    <td><button data-index="${index}" class="delete-payment-btn">Delete</button></td>
-                `;
-            });
-            document.querySelectorAll('.delete-payment-btn').forEach(button => {
-                button.onclick = deletePaymentRecord;
-            });
-        }
-
-        /**
-         * Deletes a payment record from history.
-         * @param {Event} event - The click event.
-         */
-        function deletePaymentRecord(event) {
-            const index = event.target.dataset.index;
-            const payments = JSON.parse(localStorage.getItem(PAYMENT_HISTORY_KEY) || '[]');
-            
-            const deletedPayment = payments[index];
-            if (deletedPayment && deletedPayment.paid > 0) {
-                // Add the paid amount back to the global accumulated balance
-                let globalAccumulatedBalance = parseFloat(localStorage.getItem(CURRENT_BALANCE_KEY) || 0);
-                globalAccumulatedBalance += deletedPayment.paid;
-                localStorage.setItem(CURRENT_BALANCE_KEY, globalAccumulatedBalance.toFixed(2));
-            }
-
-            payments.splice(index, 1);
-            localStorage.setItem(PAYMENT_HISTORY_KEY, JSON.stringify(payments));
-            renderPaymentHistory(); // Re-render payment history table
-
-            updateDashboardBalances(); // Update balances after deletion
-            alert('Payment record deleted and global balance adjusted!');
-        }
-
-
-        /**
-         * Toggles the visibility of balance amounts.
-         */
-        function toggleBalanceVisibility() {
-            balanceHidden = !balanceHidden;
-            updateBalanceDisplay(); // Re-render display based on new visibility state
-            toggleBalanceBtn.textContent = balanceHidden ? '👁️‍🗨️' : '👁️'; // Change icon
-        }
-
-        /**
-         * Updates the balance display elements on the dashboard.
-         * This function uses the global `previousBalance` and `currentBalance` variables.
-         */
-        function updateBalanceDisplay() {
-            previousBalanceDisplay.textContent = formatCurrency(previousBalance);
-            currentBalanceDisplay.textContent = formatCurrency(currentBalance);
-        }
-
-        /**
-         * Updates the dashboard's "Previous Balance" and "Current Balance" displays
-         * based on the currently selected date in the dashboard date selector and the global accumulated balance.
-         * 'previousBalance' will show the global balance *before* the selected day's saved transactions.
-         * 'currentBalance' will show the 'previousBalance' plus the net commission of the selected day's current entries.
-         */
-        function updateDashboardBalances() {
-            const selectedDate = dashboardDateSelector.value;
-            
-            // 1. Get the net commission of the *saved* transactions for the selected date.
-            // This represents what was *already accounted for* in the global balance for this day.
-            const savedDailyData = localStorage.getItem(DAILY_COMMISSION_KEY_PREFIX + selectedDate);
-            const savedTransactionsForDay = savedDailyData ? JSON.parse(savedDailyData) : [];
-            const savedNetCommissionForDay = calculateDeductions(savedTransactionsForDay.reduce((sum, t) => sum + t.totalCommission, 0)).netCommission;
-
-            // 2. Get the current global accumulated balance from localStorage.
-            let globalAccumulatedBalance = parseFloat(localStorage.getItem(CURRENT_BALANCE_KEY) || 0);
-
-            // 3. Calculate the 'previousBalance' for the dashboard display:
-            // This is the global balance *before* the saved net commission of the selected day.
-            // If the selected day has no saved data, this effectively is the global balance.
-            previousBalance = globalAccumulatedBalance - savedNetCommissionForDay;
-            previousBalanceDisplay.textContent = formatCurrency(previousBalance);
-
-            // 4. Calculate the 'currentBalance' for the dashboard display:
-            // This is the 'previousBalance' (from step 3) plus the net commission of the *currently loaded/edited* transactions for the selected day.
-            const currentNetCommissionForDay = calculateDeductions(currentTransactions.reduce((sum, t) => sum + t.totalCommission, 0)).netCommission;
-            currentBalance = previousBalance + currentNetCommissionForDay;
-            currentBalanceDisplay.textContent = formatCurrency(currentBalance);
-        }
-
-
-        // Event Listeners
-
-        // Dashboard date selector change
-        dashboardDateSelector.addEventListener('change', () => {
-            const selectedDate = dashboardDateSelector.value;
-            currentDateSpan.textContent = selectedDate; // Update header date
-            loadDailyTransactions(selectedDate); // Load transactions for the selected date
-            // updateDashboardBalances() is called by loadDailyTransactions -> renderTransactions -> updateSummary
-        });
-
-        // Update commission fields when quantity or rate changes
-        stockRateInput.addEventListener('input', () => {
-            const quantity = parseFloat(stockQuantityInput.value);
-            const rate = parseFloat(stockRateInput.value);
-            if (quantity > 0 && rate > 0) {
-                const { commissionPerStock, totalCommission } = calculateCommission(quantity, rate);
-                commissionPerStockInput.value = commissionPerStock.toFixed(2);
-                totalCommissionPerStockInput.value = totalCommission.toFixed(2);
-            } else {
-                commissionPerStockInput.value = '0.00';
-                totalCommissionPerStockInput.value = '0.00';
-            }
-        });
-
-        stockQuantityInput.addEventListener('input', () => {
-            const quantity = parseFloat(stockQuantityInput.value);
-            const rate = parseFloat(stockRateInput.value);
-            if (quantity > 0 && rate > 0) {
-                const { commissionPerStock, totalCommission } = calculateCommission(quantity, rate);
-                commissionPerStockInput.value = commissionPerStock.toFixed(2);
-                totalCommissionPerStockInput.value = totalCommission.toFixed(2);
-            } else {
-                commissionPerStockInput.value = '0.00';
-                totalCommissionPerStockInput.value = '0.00';
-            }
-        });
-
-        // Add new transaction entry
-        addEntryBtn.addEventListener('click', () => {
-            const stockName = stockNameInput.value.trim();
-            const quantity = parseInt(stockQuantityInput.value);
-            const rate = parseFloat(stockRateInput.value);
-            const commissionPerStock = parseFloat(commissionPerStockInput.value);
-            const totalCommission = parseFloat(totalCommissionPerStockInput.value);
-
-            if (stockName && quantity > 0 && rate > 0 && !isNaN(commissionPerStock) && !isNaN(totalCommission)) {
-                currentTransactions.push({ stockName, quantity, rate, commissionPerStock, totalCommission });
-                renderTransactions();
-                // Clear input fields after adding
-                stockNameInput.value = '';
-                stockQuantityInput.value = '';
-                stockRateInput.value = '';
-                commissionPerStockInput.value = '0.00';
-                totalCommissionPerStockInput.value = '0.00';
-            } else {
-                alert('Please fill in all stock details correctly (Stock Name, Quantity > 0, Rate > 0).');
-            }
-        });
-
-        // Delete a specific transaction row
-        function deleteTransaction(event) {
-            const index = event.target.dataset.index;
-            currentTransactions.splice(index, 1);
-            renderTransactions();
-        }
-
-        // Save current day's transactions and update global balance
-        saveDayBtn.addEventListener('click', () => {
-            const selectedDate = dashboardDateSelector.value;
-            saveDailyTransactions(selectedDate);
-            alert('Daily commission data saved and global balance updated!');
-        });
-
-        // Clear only the current day's entries from the dashboard (does not affect saved data)
-        clearEntriesBtn.addEventListener('click', () => {
-            if (confirm('Are you sure you want to clear all current entries from the dashboard? This will not affect saved data for today or previous days.')) {
-                currentTransactions = [];
-                renderTransactions();
-                // updateDashboardBalances() is called by renderTransactions -> updateSummary
-            }
-        });
-
-        // "Request Payment" button on Dashboard - now just adds a record
-        requestPaymentBtn.addEventListener('click', () => {
-            const today = formatDate(new Date());
-            const requestedAmount = parseFloat(prompt(`Enter amount to request (Current Balance: ${formatCurrency(currentBalance)}):`));
-
-            if (isNaN(requestedAmount) || requestedAmount <= 0) {
-                alert("Please enter a valid positive amount for the request.");
-                return;
-            }
-
-            // This button now only adds a *pending* request to the history
-            // The actual deduction happens when a 'Paid' amount is entered in Payment History
-            const newPayment = {
-                date: today,
-                requested: requestedAmount,
-                approved: 0, // Initially 0
-                paid: 0,     // Initially 0
-                balanceBefore: parseFloat(localStorage.getItem(CURRENT_BALANCE_KEY) || 0), // Snapshot of global balance before this request
-                balanceAfter: parseFloat(localStorage.getItem(CURRENT_BALANCE_KEY) || 0)   // Balance doesn't change until paid
-            };
-            addPaymentRecord(newPayment);
-            alert(`Payment request of ${formatCurrency(requestedAmount)} added. Please go to 'Payment History' to update its status.`);
-        });
-
-        // New print button for daily transactions
-        printDailyBtn.addEventListener('click', () => {
-            // Temporarily hide the action column for printing
-            const actionColumnHeader = document.querySelector('#transactions-table th:last-child');
-            const actionColumnCells = document.querySelectorAll('#transactions-table td:last-child');
-
-            if (actionColumnHeader) actionColumnHeader.style.display = 'none';
-            actionColumnCells.forEach(cell => cell.style.display = 'none');
-
-            window.print();
-
-            // Restore the action column after printing
-            if (actionColumnHeader) actionColumnHeader.style.display = '';
-            actionColumnCells.forEach(cell => cell.style.display = '');
-        });
-
-        // Toggle balance visibility
-        toggleBalanceBtn.addEventListener('click', toggleBalanceVisibility);
-
-
-        // Navigation Functionality
-        /**
-         * Shows a specific section of the application and updates active navigation link.
-         * @param {string} sectionId - The ID of the section to show (e.g., 'dashboard-section').
-         */
-        function showSection(sectionId) {
-            dashboardSection.style.display = 'none';
-            reportsSection.style.display = 'none';
-            paymentHistorySection.style.display = 'none';
-            monthClosureSection.style.display = 'none';
-            settingsSection.style.display = 'none';
-
-            document.getElementById(sectionId).style.display = 'block';
-
-            document.querySelectorAll('#sidebar ul li a').forEach(link => {
-                link.classList.remove('active');
-            });
-            document.getElementById(`nav-${sectionId.replace('-section', '')}`).classList.add('active');
-
-            if (sectionId === 'payment-history-section') {
-                renderPaymentHistory();
-                // Set default date for payment form
-                paymentDateInput.value = formatDate(new Date());
-            }
-        }
-
-        navDashboard.addEventListener('click', (e) => { e.preventDefault(); showSection('dashboard-section'); });
-        navReports.addEventListener('click', (e) => { e.preventDefault(); showSection('reports-section'); });
-        navPaymentHistory.addEventListener('click', (e) => { e.preventDefault(); showSection('payment-history-section'); });
-        navMonthClosure.addEventListener('click', (e) => { e.preventDefault(); showSection('month-closure-section'); });
-        navSettings.addEventListener('click', (e) => { e.preventDefault(); showSection('settings-section'); });
-
-        // Reports Functionality
-        // View single day/month report
-        viewSingleReportBtn.addEventListener('click', () => {
-            const selectedDate = reportDateSelector.value;
-            const selectedMonth = reportMonthSelector.value;
-            const selectedYear = reportYearSelector.value;
-            reportDisplay.innerHTML = ''; // Clear previous report
-
-            if (selectedDate) {
-                // View daily report
-                const data = localStorage.getItem(DAILY_COMMISSION_KEY_PREFIX + selectedDate);
-                if (data) {
-                    const transactions = JSON.parse(data);
-                    let totalGrossCommission = transactions.reduce((sum, t) => sum + t.totalCommission, 0);
-                    const { hoDeduction, remainingCommission, taxDeduction, netCommission } = calculateDeductions(totalGrossCommission);
-
-                    let reportHtml = `<h3>Daily Commission Report for ${selectedDate}</h3>`;
-                    reportHtml += `<table border="1">
-                        <thead>
-                            <tr>
-                                <th>Stock Name</th>
-                                <th>Quantity</th>
-                                <th>Rate (PKR)</th>
-                                <th>Comm. per Stock (PKR)</th>
-                                <th>Total Comm. (PKR)</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-                    if (transactions.length === 0) {
-                        reportHtml += `<tr><td colspan="5" style="text-align: center;">No transactions recorded for this day.</td></tr>`;
-                    } else {
-                        transactions.forEach(t => {
-                            reportHtml += `<tr>
-                                <td>${t.stockName}</td>
-                                <td>${t.quantity}</td>
-                                <td>${t.rate.toFixed(2)}</td>
-                                <td>${t.commissionPerStock.toFixed(2)}</td>
-                                <td>${t.totalCommission.toFixed(2)}</td>
-                            </tr>`;
-                        });
-                    }
-                    reportHtml += `</tbody></table>`;
-                    reportHtml += `<div class="report-summary">
-                        <p><strong>Gross Commission:</strong> <span>${totalGrossCommission.toFixed(2)} PKR</span></p>
-                        <p><strong>Head Office Deduction (40%):</strong> <span>${hoDeduction.toFixed(2)} PKR</span></p>
-                        <p><strong>Remaining Commission:</strong> <span>${remainingCommission.toFixed(2)} PKR</span></p>
-                        <p><strong>Tax Deduction (12%):</strong> <span>${taxDeduction.toFixed(2)} PKR</span></p>
-                        <p><strong>Net Commission:</strong> <span>${netCommission.toFixed(2)} PKR</span></p>
-                    </div>`;
-                    reportDisplay.innerHTML = reportHtml;
-                } else {
-                    reportDisplay.innerHTML = `<p>No daily commission data found for ${selectedDate}.</p>`;
-                }
-            } else if (selectedMonth && selectedYear) {
-                // View monthly summary
-                const monthKey = `${selectedYear}-${selectedMonth}`;
-                const monthlySummary = localStorage.getItem(MONTHLY_SUMMARY_KEY_PREFIX + monthKey);
-                if (monthlySummary) {
-                    reportDisplay.innerHTML = `<h3>Monthly Summary for ${new Date(selectedYear, parseInt(selectedMonth) - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })}</h3>` + monthlySummary;
-                } else {
-                    reportDisplay.innerHTML = `<p>No monthly summary found for ${new Date(selectedYear, parseInt(selectedMonth) - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })}. Please generate it first from the "Month Closure" section.</p>`;
-                }
-            } else {
-                reportDisplay.innerHTML = '<p>Please select a specific date or a month and year to view a report.</p>';
-            }
-        });
-
-        // View Date Range Report
-        viewDateRangeReportBtn.addEventListener('click', () => {
-            const startDateStr = reportStartDateSelector.value;
-            const endDateStr = reportEndDateSelector.value;
-
-            if (!startDateStr || !endDateStr) {
-                alert('Please select both start and end dates for the date range report.');
-                return;
-            }
-
-            const startDate = new Date(startDateStr);
-            const endDate = new Date(endDateStr);
-
-            if (startDate > endDate) {
-                alert('Start date cannot be after end date.');
-                return;
-            }
-
-            let allTransactionsInDateRange = [];
-            let totalGrossCommissionRange = 0;
-
-            // Iterate through dates from start to end, inclusive
-            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                const dateKey = formatDate(d);
-                const dailyData = localStorage.getItem(DAILY_COMMISSION_KEY_PREFIX + dateKey);
-                if (dailyData) {
-                    const transactions = JSON.parse(dailyData);
-                    transactions.forEach(t => {
-                        allTransactionsInDateRange.push({ date: dateKey, ...t });
-                        totalGrossCommissionRange += t.totalCommission;
-                    });
-                }
-            }
-
-            const { hoDeduction, remainingCommission, taxDeduction, netCommission } = calculateDeductions(totalGrossCommissionRange);
-
-            let reportContent = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Commission Report (${startDateStr} to ${endDateStr})</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; margin: 20px; }
-                        h1, h2, h3 { text-align: center; color: #2c3e50; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 0.9em; }
-                        th { background-color: #f2f2f2; color: #333; }
-                        .report-summary { margin-top: 30px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 5px; background-color: #f9f9f9; }
-                        .report-summary div { margin-bottom: 8px; font-size: 1.1em; display: flex; justify-content: space-between; }
-                        .report-summary div strong { color: #333; }
-                        .report-summary div span { color: #007bff; font-weight: bold; }
-                        .developer-info { text-align: center; margin-top: 50px; font-size: 0.8em; color: #555; border-top: 1px solid #eee; padding-top: 10px;}
-                        .developer-info a { color: #555; text-decoration: none; }
-                        @media print {
-                            body { margin: 0; padding: 0; }
-                            .report-summary { border: none; background-color: transparent; padding: 0; margin-top: 15px; font-size: 0.9em; }
-                            .report-summary div { margin-bottom: 4px; }
-                            table { page-break-inside: auto; }
-                            tr { page-break-inside: avoid; page-break-after: auto; }
-                            thead { display: table-header-group; }
-                            tfoot { display: table-footer-group; }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <h1>Darson Securities Limited</h1>
-                    <h2>Commission Report</h2>
-                    <h3>Report for Date Range: ${startDateStr} to ${endDateStr}</h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Stock Name</th>
-                                <th>Quantity</th>
-                                <th>Rate (PKR)</th>
-                                <th>Comm. per Stock (PKR)</th>
-                                <th>Total Comm. (PKR)</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-
-            if (allTransactionsInDateRange.length === 0) {
-                reportContent += `<tr><td colspan="6" style="text-align: center;">No transactions found for this date range.</td></tr>`;
-            } else {
-                allTransactionsInDateRange.forEach(t => {
-                    reportContent += `
-                        <tr>
-                            <td>${t.date}</td>
-                            <td>${t.stockName}</td>
-                            <td>${t.quantity}</td>
-                            <td>${t.rate.toFixed(2)}</td>
-                            <td>${t.commissionPerStock.toFixed(2)}</td>
-                            <td>${t.totalCommission.toFixed(2)}</td>
-                        </tr>`;
-                });
-            }
-
-            reportContent += `
-                        </tbody>
-                    </table>
-                    <div class="report-summary">
-                        <div><strong>Gross Commission:</strong> <span>${totalGrossCommissionRange.toFixed(2)} PKR</span></div>
-                        <div><strong>Head Office Deduction (40%):</strong> <span>${hoDeduction.toFixed(2)} PKR</span></div>
-                        <div><strong>Remaining Commission:</strong> <span>${remainingCommission.toFixed(2)} PKR</span></div>
-                        <div><strong>Tax Deduction (12%):</strong> <span>${taxDeduction.toFixed(2)} PKR</span></div>
-                        <div><strong>Net Commission:</strong> <span>${netCommission.toFixed(2)} PKR</span></div>
-                    </div>
-                    <div class="developer-info">
-                        Developed by Afrasiab Asghar | <a href="http://www.Nextgensites.org" target="_blank">www.Nextgensites.org</a> | Contact +923060406003
-                    </div>
-                </body>
-                </html>
-            `;
-
-            const newWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
-            newWindow.document.write(reportContent);
-            newWindow.document.close();
-            newWindow.focus(); // Bring the new window to front
-        });
-
-
-        // Print the currently displayed report
-        printReportBtn.addEventListener('click', () => {
-            window.print();
-        });
-
-        // Securely delete reports
-        deleteReportBtn.addEventListener('click', () => {
-            const password = deletePasswordInput.value;
-            if (password !== AUTH_PASSWORD) {
-                alert('Incorrect password. Report deletion failed.');
-                return;
-            }
-
-            const selectedDate = reportDateSelector.value;
-            const selectedMonth = reportMonthSelector.value;
-            const selectedYear = reportYearSelector.value;
-
-            if (selectedDate) {
-                if (confirm(`Are you sure you want to delete the daily report for ${selectedDate}? This action cannot be undone.`)) {
-                    localStorage.removeItem(DAILY_COMMISSION_KEY_PREFIX + selectedDate);
-                    reportDisplay.innerHTML = `<p>Report for ${selectedDate} has been deleted.</p>`;
-                    alert('Daily report deleted successfully!');
-                    updateDashboardBalances(); // Update balances after deletion
-                }
-            } else if (selectedMonth && selectedYear) {
-                if (confirm(`Are you sure you want to delete the monthly summary for ${selectedMonth}/${selectedYear}? This action cannot be undone.`)) {
-                    const monthKey = `${selectedYear}-${selectedMonth}`;
-                    localStorage.removeItem(MONTHLY_SUMMARY_KEY_PREFIX + monthKey);
-                    reportDisplay.innerHTML = `<p>Monthly summary for ${selectedMonth}/${selectedYear} has been deleted.</p>`;
-                    alert('Monthly summary deleted successfully!');
-                }
-            } else {
-                alert('Please select a specific date or a month and year to delete a report.');
-            }
-            deletePasswordInput.value = ''; // Clear password field
-        });
-
-        // Payment History Form Submission
-        addPaymentRecordBtn.addEventListener('click', () => {
-            const date = paymentDateInput.value;
-            const requested = parseFloat(paymentRequestedInput.value || 0);
-            const approved = parseFloat(paymentApprovedInput.value || 0);
-            const paid = parseFloat(paymentPaidInput.value || 0);
-
-            if (!date) {
-                alert('Please enter a date for the payment record.');
-                return;
-            }
-
-            const payments = JSON.parse(localStorage.getItem(PAYMENT_HISTORY_KEY) || '[]');
-            const existingPaymentIndex = payments.findIndex(p => p.date === date);
-
-            let oldPaidAmountForThisDate = 0;
-            if (existingPaymentIndex > -1) {
-                oldPaidAmountForThisDate = payments[existingIndex].paid || 0;
-            }
-
-            let globalAccumulatedBalance = parseFloat(localStorage.getItem(CURRENT_BALANCE_KEY) || 0);
-
-            // Calculate balanceBefore and balanceAfter for the payment record itself
-            // balanceBefore should be the global balance *before* this specific payment's 'paid' amount is applied.
-            // So, we temporarily add back the old paid amount (if updating) to get the true balance before this transaction.
-            const balanceBeforePayment = globalAccumulatedBalance + oldPaidAmountForThisDate;
-
-            // Now, deduct the new paid amount from the global balance
-            globalAccumulatedBalance = balanceBeforePayment - paid;
-            localStorage.setItem(CURRENT_BALANCE_KEY, globalAccumulatedBalance.toFixed(2));
-
-            const newPayment = {
-                date: date,
-                requested: requested,
-                approved: approved,
-                paid: paid,
-                balanceBefore: balanceBeforePayment,
-                balanceAfter: globalAccumulatedBalance // This is the new global balance after this payment
-            };
-
-            addPaymentRecord(newPayment); // This function handles adding or updating the record in payment history
-
-            updateDashboardBalances(); // This will refresh the dashboard's previous/current balance
-            alert('Payment record added/updated successfully and global balance adjusted!');
-
-            // Clear form fields
-            paymentRequestedInput.value = '';
-            paymentApprovedInput.value = '';
-            paymentPaidInput.value = '';
-            paymentDateInput.value = formatDate(new Date()); // Reset to today's date
-        });
-
-
-        // Month Closure Functionality
-        generateMonthlySummaryBtn.addEventListener('click', () => {
-            const month = closeMonthSelector.value;
-            const year = closeYearSelector.value;
-
-            if (!month || !year) {
-                alert('Please select a month and year for month closure.');
-                return;
-            }
-
-            const monthKey = `${year}-${month}`;
-            let totalMonthNetCommission = 0;
-            let transactionDaysCount = 0;
-            let firstDayOfMonth = new Date(year, parseInt(month) - 1, 1);
-            let lastDayOfMonth = new Date(year, parseInt(month), 0);
-
-            let monthlySummaryHtml = `<h4>Detailed Monthly Summary for ${new Date(year, parseInt(month) - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })}</h4>`;
-            monthlySummaryHtml += `<table><thead><tr><th>Date</th><th>Gross Comm.</th><th>HO Deduction</th><th>Tax</th><th>Net Comm.</th></tr></thead><tbody>`;
-
-            let hasTransactionsInMonth = false;
-
-            for (let d = new Date(firstDayOfMonth); d <= lastDayOfMonth; d.setDate(d.getDate() + 1)) {
-                const dateStr = formatDate(d);
-                const dailyData = localStorage.getItem(DAILY_COMMISSION_KEY_PREFIX + dateStr);
-                if (dailyData) {
-                    const transactions = JSON.parse(dailyData);
-                    if (transactions.length > 0) {
-                        hasTransactionsInMonth = true;
-                        transactionDaysCount++;
-                        let dailyGrossCommission = transactions.reduce((sum, t) => sum + t.totalCommission, 0);
-                        const { hoDeduction, remainingCommission, taxDeduction, netCommission } = calculateDeductions(dailyGrossCommission);
-                        totalMonthNetCommission += netCommission;
-
-                        monthlySummaryHtml += `<tr>
-                            <td>${dateStr}</td>
-                            <td>${dailyGrossCommission.toFixed(2)}</td>
-                            <td>${hoDeduction.toFixed(2)}</td>
-                            <td>${taxDeduction.toFixed(2)}</td>
-                            <td>${netCommission.toFixed(2)}</td>
-                        </tr>`;
-                    }
-                }
-            }
-            monthlySummaryHtml += `</tbody></table>`;
-
-            if (!hasTransactionsInMonth) {
-                monthlySummaryHtml = `<p>No daily commission data found for ${new Date(year, parseInt(month) - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })}.</p>`;
-            } else {
-                // Overall summary for the month
-                monthlySummaryHtml += `<div class="report-summary">
-                    <p><strong>Total Days with Transactions:</strong> <span>${transactionDaysCount}</span></p>
-                    <p><strong>Total Net Commission for the Month:</strong> <span>${totalMonthNetCommission.toFixed(2)} PKR</span></p>
-                </div>`;
-            }
-
-
-            monthlySummaryDisplay.innerHTML = monthlySummaryHtml;
-            // Save the generated monthly summary HTML for later viewing in reports
-            localStorage.setItem(MONTHLY_SUMMARY_KEY_PREFIX + monthKey, monthlySummaryHtml);
-
-            if (hasTransactionsInMonth) {
-                alert('Monthly summary generated and saved!');
-            }
-        });
-
-        // Settings: Save Manual Previous Balance
-        saveManualBalanceBtn.addEventListener('click', () => {
-            const password = settingsPasswordInput.value;
-            if (password !== AUTH_PASSWORD) {
-                alert('Incorrect password. Manual balance update failed.');
-                return;
-            }
-
-            const newBalance = parseFloat(manualPreviousBalanceInput.value);
-            if (isNaN(newBalance)) {
-                alert('Please enter a valid number for the new balance.');
-                return;
-            }
-
-            if (confirm(`Are you sure you want to set the global accumulated balance to ${formatCurrency(newBalance)}? This will override previous calculations.`)) {
-                localStorage.setItem(CURRENT_BALANCE_KEY, newBalance.toFixed(2));
-                alert('Global accumulated balance updated successfully!');
-                settingsPasswordInput.value = ''; // Clear password
-                manualPreviousBalanceInput.value = ''; // Clear input
-                updateDashboardBalances(); // Refresh dashboard display based on new global balance
-            }
-        });
-
-        // Reset Software Functionality (moved to settings section)
-        confirmResetBtn.addEventListener('click', () => {
-            const password = resetPasswordInput.value;
-            if (password !== AUTH_PASSWORD) {
-                alert('Incorrect password. Software reset aborted.');
-                return;
-            }
-
-            if (confirm('Are you absolutely sure you want to reset ALL software data? This action is irreversible and will delete all commissions, payments, and balances.')) {
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key.startsWith(LOCAL_STORAGE_PREFIX)) {
-                        localStorage.removeItem(key);
-                        i--; // Adjust index as item is removed
-                    }
-                }
-                alert('All software data has been reset successfully!');
-                window.location.reload(); // Reload the page to reflect the reset state
-            }
-            resetPasswordInput.value = ''; // Clear password field
-        });
-
-        // Login Logic
-        loginBtn.addEventListener('click', () => {
-            const username = usernameInput.value;
-            const password = passwordInput.value;
-
-            if (username === AUTH_USERNAME && password === AUTH_PASSWORD) {
-                localStorage.setItem('loggedIn', 'true');
-                loginError.textContent = '';
-                document.body.classList.remove('logged-out');
-                document.body.classList.add('logged-in');
-                initializeUI(); // Initialize the main application UI
-            } else {
-                loginError.textContent = 'Invalid username or password.';
-            }
-        });
-
-        // Logout Logic
-        logoutButton.addEventListener('click', () => {
-            if (confirm('Are you sure you want to log out?')) {
-                localStorage.removeItem('loggedIn');
-                document.body.classList.remove('logged-in');
-                document.body.classList.add('logged-out');
-                usernameInput.value = '';
-                passwordInput.value = '';
-                loginError.textContent = '';
-                showSection('dashboard-section'); // Reset to dashboard view on logout
-            }
-        });
-
-        // Theme Toggle Logic
-        themeToggleBtn.addEventListener('click', () => {
-            document.body.classList.toggle('dark-mode');
-            const isDarkMode = document.body.classList.contains('dark-mode');
-            localStorage.setItem(THEME_PREFERENCE_KEY, isDarkMode ? 'dark' : 'light');
-            themeToggleBtn.textContent = isDarkMode ? 'Light Mode' : 'Dark Mode';
-        });
-
-        /**
-         * Initializes the main application UI components and data.
-         * This function is called after successful login or on page load if already logged in.
-         */
-        function initializeUI() {
-            const today = new Date();
-            const todayFormatted = formatDate(today);
-            currentDateSpan.textContent = todayFormatted;
-            dashboardDateSelector.value = todayFormatted;
-
-            reportDateSelector.value = todayFormatted;
-            reportStartDateSelector.value = todayFormatted;
-            reportEndDateSelector.value = todayFormatted;
-
-            ensureGlobalBalanceExists();
-            loadDailyTransactions(todayFormatted);
-
-            const currentMonth = String(today.getMonth() + 1).padStart(2, '0');
-            const currentYear = today.getFullYear();
-            reportMonthSelector.value = currentMonth;
-            reportYearSelector.value = currentYear;
-            closeMonthSelector.value = currentMonth;
-            closeYearSelector.value = currentYear;
-
-            paymentDateInput.value = todayFormatted;
-
-            // Apply saved theme preference
-            const savedTheme = localStorage.getItem(THEME_PREFERENCE_KEY);
-            if (savedTheme === 'dark') {
-                document.body.classList.add('dark-mode');
-                themeToggleBtn.textContent = 'Light Mode';
-            } else {
-                document.body.classList.remove('dark-mode');
-                themeToggleBtn.textContent = 'Dark Mode';
-            }
-
-            showSection('dashboard-section'); // Show dashboard by default after login
-        }
-
-        // Initial check on window load
-        window.onload = () => {
-            if (localStorage.getItem('loggedIn') === 'true') {
-                document.body.classList.add('logged-in');
-                initializeUI();
-            } else {
-                document.body.classList.add('logged-out');
-                loginPage.style.display = 'flex'; // Ensure login page is visible
-                appContainer.style.display = 'none'; // Ensure app is hidden
-            }
-        };
-
-    </script>
 </body>
 </html>
