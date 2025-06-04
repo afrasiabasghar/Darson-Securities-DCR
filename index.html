@@ -3,1657 +3,1364 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Darson Securities Limited - Commission Report</title>
+    <title>Darson Securities Commission Software</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script type="module">
-        // Firebase App (the core Firebase SDK) is always required and must be listed first
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, 
-            signInAnonymously, 
-            signInWithCustomToken, 
-            onAuthStateChanged,
-            setPersistence,
-            browserLocalPersistence // Or browserSessionPersistence
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            doc, 
-            getDoc, 
-            setDoc, 
-            updateDoc, 
-            deleteDoc, 
-            collection, 
-            addDoc,
-            query, 
-            where, 
-            getDocs,
-            Timestamp,
-            writeBatch,
-            onSnapshot,
-            setLogLevel
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Global Firebase instances
-        let app;
-        let auth;
-        let db;
-        let userId;
-        let currentView = 'login'; // Initial view
-
-        // App configuration
-        const APP_NAME = "Darson Securities Limited";
-        const APP_SUBTITLE = "Commission Report";
-        const DEVELOPER_INFO = "Developed by Afrasiab Asghar. Visit www.Nexgensites.org or Contact +923060406003";
-        const LOGIN_USERNAME = "DARSON";
-        const LOGIN_PASSWORD = "AFRASIAB"; // Also used for report deletion
-
-        // Firestore collection paths
-        const getTransactionsCollectionPath = () => `artifacts/${appId}/users/${userId}/transactions`;
-        const getDailySummariesCollectionPath = () => `artifacts/${appId}/users/${userId}/dailySummaries`;
-        const getMonthlySummariesCollectionPath = () => `artifacts/${appId}/users/${userId}/monthlySummaries`;
-        const getPaymentRequestsCollectionPath = () => `artifacts/${appId}/users/${userId}/paymentRequests`;
-        const getAppStateDocPath = () => `artifacts/${appId}/users/${userId}/appState/currentUserState`;
-        
-        let appId = typeof __app_id !== 'undefined' ? __app_id : 'brokerage-app-dev';
-
-
-        // State variables
-        let dailyEntries = [];
-        let currentBalance = 0;
-        let balanceVisible = true;
-        let selectedDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-
-        // Commission Rates Structure
-        const commissionRates = [
-            { min: 0.01, max: 3.00, rate: 0.03, type: 'flat' },
-            { min: 3.01, max: 20.00, rate: 0.07, type: 'flat' },
-            { min: 20.01, max: 40.00, rate: 0.09, type: 'flat' },
-            { min: 40.01, max: 50.00, rate: 0.12, type: 'flat' },
-            { min: 50.01, max: 90.00, rate: 0.14, type: 'flat' },
-            { min: 90.01, max: 100.00, rate: 0.17, type: 'flat' },
-            { min: 100.01, max: Infinity, rate: 0.0017, type: 'percentage' } // 0.17%
-        ];
-
-        // Deduction percentages
-        const HEAD_OFFICE_DEDUCTION_RATE = 0.40; // 40%
-        const TAX_ON_REMAINING_RATE = 0.12; // 12% on the remaining 60%
-
-        // DOM Elements (to be assigned in DOMContentLoaded)
-        let loginSection, appSection, mainContent, sidebar;
-        let usernameInput, passwordInput, loginError;
-        let currentViewTitle, currentDateDisplay, mainHeaderTitleEl, footerDevInfoP, loginDevInfoP;
-        // Dashboard elements
-        let stockNameInput, quantityInput, rateInput, addEntryButton, entriesTableBody, dailySummaryDiv;
-        let dashboardDateInput, totalGrossCommissionEl, headOfficeDeductionEl, taxableAmountEl, taxDeductionEl, netCommissionEl;
-        let previousBalanceEl, currentDayNetCommissionEl, newBalanceEl, saveDayButton, printDayButton;
-        let balanceDisplayEl, toggleBalanceButton;
-        // Report elements
-        let reportDateInput, reportMonthInput, viewDateReportButton, viewMonthReportButton, reportContentDiv, deleteReportButton;
-        // Payment elements
-        let prDateInput, prAmountInput, prAddButton, prListDiv;
-        // Month Closure elements
-        let mcMonthInput, mcCloseMonthButton, mcReportDiv;
-        let modal, modalContent, modalCloseButton, modalTitle, modalBody, modalActions;
-
-
-        // --- UTILITY FUNCTIONS ---
-        const formatCurrency = (amount) => `PKR ${Number(amount).toFixed(2)}`;
-        const formatDate = (dateStrOrObj) => {
-            const date = new Date(dateStrOrObj);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        };
-        const getMonthYear = (dateStrOrObj) => {
-            const date = new Date(dateStrOrObj);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            return `${year}-${month}`;
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
 
-        const showToast = (message, type = 'info') => {
-            const toast = document.getElementById('toastNotification');
-            const toastMessage = document.getElementById('toastMessage');
-            if (!toast || !toastMessage) {
-                console.warn("Toast elements not found for message:", message);
-                return;
-            }
-            toastMessage.textContent = message;
-            
-            toast.classList.remove('hidden', 'bg-green-500', 'bg-red-500', 'bg-blue-500', 'bg-yellow-500');
-            if (type === 'success') toast.classList.add('bg-green-500');
-            else if (type === 'error') toast.classList.add('bg-red-500');
-            else if (type === 'warning') toast.classList.add('bg-yellow-500');
-            else toast.classList.add('bg-blue-500');
-            
-            toast.classList.remove('opacity-0');
-            toast.classList.add('opacity-100');
-
-            setTimeout(() => {
-                toast.classList.remove('opacity-100');
-                toast.classList.add('opacity-0');
-                setTimeout(() => toast.classList.add('hidden'), 500);
-            }, 3000);
-        };
-        
-        const showModal = (title, bodyContent, actions = []) => {
-            if (!modal || !modalTitle || !modalBody || !modalActions) {
-                console.error("Modal elements not found.");
-                return;
-            }
-            modalTitle.textContent = title;
-            modalBody.innerHTML = ''; // Clear previous content
-            if (typeof bodyContent === 'string') {
-                const p = document.createElement('p');
-                p.innerHTML = bodyContent; // Use innerHTML to allow basic HTML like <br>
-                modalBody.appendChild(p);
-            } else {
-                modalBody.appendChild(bodyContent); // Append DOM element directly
-            }
-
-            modalActions.innerHTML = '';
-            actions.forEach(action => {
-                const button = document.createElement('button');
-                button.textContent = action.label;
-                button.className = action.className || 'px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600';
-                button.onclick = () => {
-                    action.callback(); // Consider if callback should prevent hideModal
-                    hideModal();
-                };
-                modalActions.appendChild(button);
-            });
-            
-            const cancelButton = document.createElement('button');
-            cancelButton.textContent = 'Cancel';
-            cancelButton.className = 'px-4 py-2 bg-gray-300 text-black rounded hover:bg-gray-400 ml-2';
-            cancelButton.onclick = hideModal;
-            modalActions.appendChild(cancelButton);
-
-            modal.classList.remove('hidden');
-        };
-
-        const hideModal = () => {
-            if(modal) modal.classList.add('hidden');
-        };
-
-        const promptPassword = (callbackOnSuccess) => {
-            const passwordPromptDiv = document.createElement('div');
-            passwordPromptDiv.innerHTML = `
-                <label for="modalPasswordInput" class="block text-sm font-medium text-gray-700">Enter Password:</label>
-                <input type="password" id="modalPasswordInput" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" autocomplete="current-password">
-                <p id="modalPasswordError" class="text-red-500 text-sm mt-1 hidden"></p>
-            `;
-            const actions = [{
-                label: 'Submit',
-                className: 'px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600',
-                callback: () => {
-                    const enteredPassword = document.getElementById('modalPasswordInput').value;
-                    const errorEl = document.getElementById('modalPasswordError');
-                    if (enteredPassword === LOGIN_PASSWORD) {
-                        if (errorEl) errorEl.classList.add('hidden');
-                        callbackOnSuccess();
-                        // hideModal() will be called by the showModal's action wrapper
-                    } else {
-                        if (errorEl) {
-                           errorEl.textContent = 'Incorrect password.';
-                           errorEl.classList.remove('hidden');
-                        }
-                         showToast('Incorrect password.', 'error');
-                         // Modal remains open for re-try if showModal's callback doesn't auto-hide on error.
-                         // Current implementation hides it.
-                    }
-                }
-            }];
-            showModal('Password Required', passwordPromptDiv, actions);
-        };
-
-
-        // --- FIREBASE SETUP ---
-        const initializeFirebase = async () => {
-            try {
-                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-                if (!firebaseConfig.apiKey) { 
-                    console.error("Firebase config is missing or invalid.");
-                    if (loginError) {
-                        loginError.textContent = "Application configuration error. Cannot initialize.";
-                        loginError.classList.remove('hidden');
-                    }
-                    return false;
-                }
-
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                setLogLevel('debug'); 
-
-                await setPersistence(auth, browserLocalPersistence); 
-
-                return new Promise((resolve) => {
-                    onAuthStateChanged(auth, async (user) => {
-                        if (user) {
-                            userId = user.uid;
-                            console.log("User is signed in with UID:", userId);
-                            await loadInitialData();
-                            resolve(true);
-                        } else {
-                            console.log("No user signed in. Attempting sign in...");
-                            try {
-                                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                                    await signInWithCustomToken(auth, __initial_auth_token);
-                                } else {
-                                    await signInAnonymously(auth);
-                                }
-                            } catch (error) {
-                                console.error("Error during automated sign-in:", error);
-                                if(loginError) {
-                                    loginError.textContent = "Authentication failed. Please try again later.";
-                                    loginError.classList.remove('hidden');
-                                }
-                                resolve(false);
-                            }
-                        }
-                    });
-                });
-
-            } catch (error) {
-                console.error("Firebase Initialization Error:", error);
-                if (loginError) {
-                    loginError.textContent = "Failed to initialize application services.";
-                    loginError.classList.remove('hidden');
-                }
-                return false;
-            }
-        };
-
-        // --- DATA HANDLING ---
-        const loadInitialData = async () => {
-            if (!userId) return;
-            try {
-                const appStateRef = doc(db, getAppStateDocPath());
-                const appStateSnap = await getDoc(appStateRef);
-                if (appStateSnap.exists()) {
-                    const data = appStateSnap.data();
-                    currentBalance = data.currentBalance || 0;
-                } else {
-                    await setDoc(appStateRef, { currentBalance: 0, lastMonthClosed: null });
-                    currentBalance = 0;
-                }
-                updateBalanceDisplay();
-                if (currentView === 'dashboard') {
-                    loadDashboardData(); 
-                }
-            } catch (error) {
-                console.error("Error loading initial data:", error);
-                showToast("Error loading initial application state.", "error");
-            }
-        };
-
-        const updateAppState = async (data) => {
-            if (!userId) return;
-            try {
-                const appStateRef = doc(db, getAppStateDocPath());
-                await updateDoc(appStateRef, data);
-            } catch (error) {
-                console.error("Error updating app state:", error);
-                showToast("Error saving application state.", "error");
-            }
-        };
-
-        // --- COMMISSION CALCULATION ---
-        const calculateCommissionForItem = (quantity, stockRate) => {
-            let commissionPerStock = 0;
-            let totalCommission = 0;
-
-            for (const tier of commissionRates) {
-                if (stockRate >= tier.min && stockRate <= tier.max) {
-                    if (tier.type === 'flat') {
-                        commissionPerStock = tier.rate;
-                        totalCommission = quantity * commissionPerStock;
-                    } else if (tier.type === 'percentage') {
-                        commissionPerStock = (stockRate * tier.rate); 
-                        totalCommission = quantity * stockRate * tier.rate;
-                    }
-                    break;
-                }
-            }
-            return { commissionPerStock, totalCommission };
-        };
-        
-        const calculateDailySummary = () => {
-            const gross = dailyEntries.reduce((sum, entry) => sum + entry.totalCommission, 0);
-            const hoDeduction = gross * HEAD_OFFICE_DEDUCTION_RATE;
-            const remainingAfterHO = gross - hoDeduction;
-            const tax = remainingAfterHO * TAX_ON_REMAINING_RATE;
-            const net = remainingAfterHO - tax;
-
-            return {
-                grossCommission: gross,
-                headOfficeDeduction: hoDeduction,
-                taxableAmount: remainingAfterHO, 
-                taxDeduction: tax,
-                netCommission: net
-            };
-        };
-
-        // --- UI UPDATES & NAVIGATION ---
-        const switchView = (viewName) => {
-            currentView = viewName;
-            document.querySelectorAll('#mainContent > div[data-view]').forEach(div => div.classList.add('hidden'));
-            const targetView = document.getElementById(`view-${viewName}`);
-            
-            if (targetView) {
-                targetView.classList.remove('hidden');
-                if(currentViewTitle) currentViewTitle.textContent = APP_SUBTITLE + (viewName !== 'dashboard' ? ` - ${viewName.charAt(0).toUpperCase() + viewName.slice(1).replace(/([A-Z])/g, ' $1')}` : '');
-            } else {
-                console.error(`View "${viewName}" not found.`);
-                const dashboardView = document.getElementById('view-dashboard');
-                if (dashboardView) dashboardView.classList.remove('hidden'); 
-                if(currentViewTitle) currentViewTitle.textContent = APP_SUBTITLE;
-            }
-            
-            document.querySelectorAll('#sidebar a').forEach(a => {
-                a.classList.remove('bg-gray-700', 'text-white');
-                a.classList.add('text-gray-300', 'hover:bg-gray-700', 'hover:text-white');
-                if (a.getAttribute('data-view') === viewName) {
-                    a.classList.add('bg-gray-700', 'text-white');
-                }
-            });
-
-            if (viewName === 'dashboard') loadDashboardData();
-            if (viewName === 'dailyReports' || viewName === 'monthlyReports') clearReportContent();
-            if (viewName === 'paymentRequests') loadPaymentRequests();
-            if (viewName === 'monthClosure') clearMonthClosureReport();
-
-            if(currentDateDisplay) currentDateDisplay.textContent = formatDate(new Date()); 
-        };
-
-        const updateBalanceDisplay = () => {
-            if (balanceDisplayEl) {
-                balanceDisplayEl.textContent = balanceVisible ? formatCurrency(currentBalance) : 'PKR ******';
-            }
-            if (previousBalanceEl) previousBalanceEl.textContent = formatCurrency(currentBalance); 
-            updateDashboardSummary(); 
-        };
-
-        const toggleBalanceVisibility = () => {
-            balanceVisible = !balanceVisible;
-            if(toggleBalanceButton) toggleBalanceButton.innerHTML = balanceVisible ? eyeIconSVG() : eyeSlashIconSVG();
-            updateBalanceDisplay();
-        };
-        
-        // --- DASHBOARD FUNCTIONS ---
-        const loadDashboardData = () => {
-            if(dashboardDateInput) dashboardDateInput.value = selectedDate;
-            dailyEntries = []; 
-            renderEntriesTable();
-            updateDashboardSummary();
-            updateBalanceDisplay(); 
-            checkExistingDailySummary(selectedDate);
-        };
-
-        const checkExistingDailySummary = async (date) => {
-            if (!userId || !db) return;
-            const summaryRef = doc(db, getDailySummariesCollectionPath(), date);
-            try {
-                const docSnap = await getDoc(summaryRef);
-                if (docSnap.exists()) {
-                    showToast(`Data for ${date} already saved. Editing will overwrite.`, "warning");
-                    const data = docSnap.data();
-                    dailyEntries = data.transactions || [];
-                    renderEntriesTable();
-                    updateDashboardSummary();
-                }
-            } catch (error) {
-                console.error("Error checking existing summary:", error);
-            }
-        };
-
-        const handleAddEntry = () => {
-            if (!stockNameInput || !quantityInput || !rateInput) return;
-            const stockName = stockNameInput.value.trim();
-            const quantity = parseInt(quantityInput.value);
-            const rate = parseFloat(rateInput.value);
-
-            if (!stockName || isNaN(quantity) || quantity <= 0 || isNaN(rate) || rate <= 0) {
-                showToast("Please enter valid stock name, quantity, and rate.", "error");
-                return;
-            }
-
-            const { commissionPerStock, totalCommission } = calculateCommissionForItem(quantity, rate);
-            
-            dailyEntries.push({
-                id: `temp-${Date.now()}`, 
-                stockName,
-                quantity,
-                rate,
-                commissionPerStock,
-                totalCommission
-            });
-
-            renderEntriesTable();
-            updateDashboardSummary();
-
-            stockNameInput.value = '';
-            quantityInput.value = '';
-            rateInput.value = '';
-            stockNameInput.focus();
-        };
-
-        const renderEntriesTable = () => {
-            if (!entriesTableBody) return;
-            entriesTableBody.innerHTML = ''; 
-            if (dailyEntries.length === 0) {
-                entriesTableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4">No entries added yet.</td></tr>`; // colspan updated to 7
-                return;
-            }
-            dailyEntries.forEach((entry, index) => {
-                const row = entriesTableBody.insertRow();
-                row.innerHTML = `
-                    <td class="px-4 py-2 border">${index + 1}</td>
-                    <td class="px-4 py-2 border">${entry.stockName}</td>
-                    <td class="px-4 py-2 border text-right">${entry.quantity}</td>
-                    <td class="px-4 py-2 border text-right">${formatCurrency(entry.rate)}</td>
-                    <td class="px-4 py-2 border text-right">${formatCurrency(entry.commissionPerStock)}</td>
-                    <td class="px-4 py-2 border text-right">${formatCurrency(entry.totalCommission)}</td>
-                    <td class="px-4 py-2 border print-hidden"><button data-id="${entry.id}" class="text-red-500 hover:text-red-700 remove-entry-btn">Remove</button></td>
-                `;
-            });
-            document.querySelectorAll('.remove-entry-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const entryId = e.target.getAttribute('data-id');
-                    dailyEntries = dailyEntries.filter(item => item.id !== entryId);
-                    renderEntriesTable();
-                    updateDashboardSummary();
-                });
-            });
-        };
-
-        const updateDashboardSummary = () => {
-            if (!totalGrossCommissionEl || !headOfficeDeductionEl || !taxableAmountEl || !taxDeductionEl || !netCommissionEl || !previousBalanceEl || !currentDayNetCommissionEl || !newBalanceEl) return;
-            const summary = calculateDailySummary();
-            totalGrossCommissionEl.textContent = formatCurrency(summary.grossCommission);
-            headOfficeDeductionEl.textContent = formatCurrency(summary.headOfficeDeduction);
-            taxableAmountEl.textContent = formatCurrency(summary.taxableAmount);
-            taxDeductionEl.textContent = formatCurrency(summary.taxDeduction);
-            netCommissionEl.textContent = formatCurrency(summary.netCommission);
-            
-            previousBalanceEl.textContent = formatCurrency(currentBalance); 
-            currentDayNetCommissionEl.textContent = formatCurrency(summary.netCommission);
-            newBalanceEl.textContent = formatCurrency(currentBalance + summary.netCommission);
-        };
-
-        const handleSaveDay = async () => {
-            if (dailyEntries.length === 0) {
-                showToast("No entries to save.", "warning");
-                return;
-            }
-            if (!userId || !db) {
-                showToast("User not authenticated or database not ready. Cannot save.", "error");
-                return;
-            }
-            if (!dashboardDateInput) return;
-            const dateToSave = dashboardDateInput.value;
-            if (!dateToSave) {
-                showToast("Please select a valid date.", "error");
-                return;
-            }
-
-            const summary = calculateDailySummary();
-            const dailySummaryData = {
-                date: dateToSave,
-                monthYear: getMonthYear(dateToSave),
-                totalGrossCommission: summary.grossCommission,
-                headOfficeDeduction: summary.headOfficeDeduction,
-                taxableAmount: summary.taxableAmount,
-                taxDeduction: summary.taxDeduction,
-                netCommission: summary.netCommission,
-                transactions: dailyEntries.map(e => ({ 
-                    stockName: e.stockName, 
-                    quantity: e.quantity, 
-                    rate: e.rate, 
-                    commissionPerStock: e.commissionPerStock, 
-                    totalCommission: e.totalCommission 
-                })),
-                openingBalance: currentBalance, 
-                closingBalance: currentBalance + summary.netCommission,
-                createdAt: Timestamp.now()
-            };
-
-            try {
-                const dailySummaryRef = doc(db, getDailySummariesCollectionPath(), dateToSave);
-                const existingSummarySnap = await getDoc(dailySummaryRef);
-                let oldNetCommission = 0;
-                if (existingSummarySnap.exists()) {
-                    oldNetCommission = existingSummarySnap.data().netCommission || 0;
-                    showToast(`Overwriting existing data for ${dateToSave}.`, "info");
-                }
-
-                const batch = writeBatch(db);
-                batch.set(dailySummaryRef, dailySummaryData); 
-
-                const newOverallBalance = currentBalance - oldNetCommission + summary.netCommission;
-                batch.update(doc(db, getAppStateDocPath()), { currentBalance: newOverallBalance });
-                
-                await batch.commit();
-
-                currentBalance = newOverallBalance; 
-                updateBalanceDisplay();
-                showToast(`Day ${dateToSave} saved successfully. New balance: ${formatCurrency(currentBalance)}`, "success");
-                dailyEntries = []; 
-                renderEntriesTable();
-                updateDashboardSummary(); 
-            } catch (error) {
-                console.error("Error saving day:", error);
-                showToast(`Error saving day: ${error.message}`, "error");
-            }
-        };
-        
-        const handlePrintDay = () => {
-            if (dailyEntries.length === 0 && (!reportContentDiv || !reportContentDiv.querySelector('div'))) { 
-                 showToast("No data to print.", "warning");
-                 return;
-            }
-            window.print();
-        };
-
-
-        // --- REPORT FUNCTIONS ---
-        const clearReportContent = () => {
-            if(reportContentDiv) reportContentDiv.innerHTML = '<p class="text-gray-500">Select date or month to view report.</p>';
-            if(deleteReportButton) deleteReportButton.classList.add('hidden');
-        };
-
-        const viewDailyReport = async () => {
-            if(!reportDateInput) return;
-            const date = reportDateInput.value;
-            if (!date) {
-                showToast("Please select a date.", "warning");
-                return;
-            }
-            if (!userId || !db) return;
-
-            try {
-                const summaryRef = doc(db, getDailySummariesCollectionPath(), date);
-                const docSnap = await getDoc(summaryRef);
-
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    renderReport(data, 'daily');
-                    if(deleteReportButton){
-                        deleteReportButton.classList.remove('hidden');
-                        deleteReportButton.setAttribute('data-report-id', date);
-                        deleteReportButton.setAttribute('data-report-type', 'daily');
-                    }
-                } else {
-                    if(reportContentDiv) reportContentDiv.innerHTML = `<p class="text-red-500">No report found for ${date}.</p>`;
-                    if(deleteReportButton) deleteReportButton.classList.add('hidden');
-                }
-            } catch (error) {
-                console.error("Error fetching daily report:", error);
-                showToast(`Error fetching report: ${error.message}`, "error");
-                if(reportContentDiv) reportContentDiv.innerHTML = `<p class="text-red-500">Error fetching report.</p>`;
-                if(deleteReportButton) deleteReportButton.classList.add('hidden');
-            }
-        };
-        
-        const viewMonthlyReport = async () => {
-            if(!reportMonthInput) return;
-            const monthYear = reportMonthInput.value; 
-            if (!monthYear) {
-                showToast("Please select a month.", "warning");
-                return;
-            }
-            if (!userId || !db) return;
-
-            try {
-                const monthlySummaryRef = doc(db, getMonthlySummariesCollectionPath(), monthYear);
-                const monthlySnap = await getDoc(monthlySummaryRef);
-
-                if (monthlySnap.exists()) {
-                     renderReport(monthlySnap.data(), 'monthlySummary');
-                     if(deleteReportButton) {
-                        deleteReportButton.classList.remove('hidden');
-                        deleteReportButton.setAttribute('data-report-id', monthYear);
-                        deleteReportButton.setAttribute('data-report-type', 'monthly');
-                     }
-                } else {
-                    const q = query(collection(db, getDailySummariesCollectionPath()), where("monthYear", "==", monthYear));
-                    const querySnapshot = await getDocs(q);
-                    
-                    if (querySnapshot.empty) {
-                        if(reportContentDiv) reportContentDiv.innerHTML = `<p class="text-red-500">No data found for ${monthYear}.</p>`;
-                        if(deleteReportButton) deleteReportButton.classList.add('hidden');
-                        return;
-                    }
-
-                    let aggregatedData = {
-                        monthYear: monthYear,
-                        totalGrossCommission: 0,
-                        totalHeadOfficeDeduction: 0,
-                        totalTaxableAmount: 0,
-                        totalTaxDeduction: 0,
-                        totalNetCommission: 0,
-                        dailySummaries: []
-                    };
-
-                    querySnapshot.forEach(docSnap => {
-                        const dailyData = docSnap.data();
-                        aggregatedData.totalGrossCommission += dailyData.totalGrossCommission || 0;
-                        aggregatedData.totalHeadOfficeDeduction += dailyData.headOfficeDeduction || 0;
-                        aggregatedData.totalTaxableAmount += dailyData.taxableAmount || 0;
-                        aggregatedData.totalTaxDeduction += dailyData.taxDeduction || 0;
-                        aggregatedData.totalNetCommission += dailyData.netCommission || 0;
-                        aggregatedData.dailySummaries.push(dailyData); 
-                    });
-                    aggregatedData.dailySummaries.sort((a,b) => new Date(a.date) - new Date(b.date));
-
-                    renderReport(aggregatedData, 'monthlyAggregation');
-                    if(deleteReportButton) deleteReportButton.classList.add('hidden'); 
-                }
-
-            } catch (error) {
-                console.error("Error fetching monthly report:", error);
-                showToast(`Error fetching monthly report: ${error.message}`, "error");
-                if(reportContentDiv) reportContentDiv.innerHTML = `<p class="text-red-500">Error fetching monthly report.</p>`;
-                if(deleteReportButton) deleteReportButton.classList.add('hidden');
-            }
-        };
-
-        const renderReport = (data, type) => {
-            if(!reportContentDiv) return;
-            let html = `<div class="printable-area p-4 border rounded-md bg-white">`;
-            html += `<div class="text-center mb-4 print-header">
-                        <h2 class="text-2xl font-bold">${APP_NAME}</h2>
-                        <p class="text-lg">${APP_SUBTITLE}</p>
-                        <p class="text-md">Date: ${type === 'daily' ? formatDate(data.date) : (type === 'monthlySummary' || type === 'monthlyAggregation' ? data.monthYear : formatDate(new Date()))}</p>
-                     </div>`;
-
-            if (type === 'daily') {
-                html += `<h3 class="text-xl font-semibold mb-2">Transactions for ${formatDate(data.date)}</h3>`;
-                html += `<table class="w-full text-sm border-collapse border border-gray-300 report-table">
-                            <thead>
-                                <tr class="bg-gray-100">
-                                    <th class="px-2 py-1 border">#</th>
-                                    <th class="px-2 py-1 border">Stock Name</th>
-                                    <th class="px-2 py-1 border text-right">Qty</th>
-                                    <th class="px-2 py-1 border text-right">Rate</th>
-                                    <th class="px-2 py-1 border text-right">Comm/Stock</th>
-                                    <th class="px-2 py-1 border text-right">Total Comm.</th>
-                                </tr>
-                            </thead>
-                            <tbody>`;
-                (data.transactions || []).forEach((item, index) => {
-                    html += `<tr>
-                                <td class="px-2 py-1 border">${index + 1}</td>
-                                <td class="px-2 py-1 border">${item.stockName}</td>
-                                <td class="px-2 py-1 border text-right">${item.quantity}</td>
-                                <td class="px-2 py-1 border text-right">${formatCurrency(item.rate)}</td>
-                                <td class="px-2 py-1 border text-right">${formatCurrency(item.commissionPerStock)}</td>
-                                <td class="px-2 py-1 border text-right">${formatCurrency(item.totalCommission)}</td>
-                             </tr>`;
-                });
-                html += `   </tbody>
-                         </table>`;
-                html += `<div class="mt-4 p-4 border rounded-md bg-gray-50 report-summary">
-                            <h4 class="font-semibold text-lg mb-2">Daily Summary:</h4>
-                            <div class="grid grid-cols-2 gap-x-4">
-                                <p>Opening Balance:</p><p class="text-right font-medium">${formatCurrency(data.openingBalance || 0)}</p>
-                                <p>Total Gross Commission:</p><p class="text-right font-medium">${formatCurrency(data.totalGrossCommission || 0)}</p>
-                                <p>Head Office Deduction (40%):</p><p class="text-right font-medium">${formatCurrency(data.headOfficeDeduction || 0)}</p>
-                                <p>Amount Before Tax:</p><p class="text-right font-medium">${formatCurrency(data.taxableAmount || 0)}</p>
-                                <p>Tax Deduction (12% on Rem.):</p><p class="text-right font-medium">${formatCurrency(data.taxDeduction || 0)}</p>
-                                <p class="font-bold">Net Commission for Day:</p><p class="text-right font-bold">${formatCurrency(data.netCommission || 0)}</p>
-                                <p class="font-bold text-blue-600">Closing Balance:</p><p class="text-right font-bold text-blue-600">${formatCurrency(data.closingBalance || 0)}</p>
-                            </div>
-                         </div>`;
-            } else if (type === 'monthlySummary' || type === 'monthlyAggregation') {
-                html += `<h3 class="text-xl font-semibold mb-2">Summary for ${data.monthYear}</h3>`;
-                 html += `<div class="mt-4 p-4 border rounded-md bg-gray-50 report-summary">
-                            <div class="grid grid-cols-2 gap-x-4">
-                                ${data.openingBalanceForMonth !== undefined ? `<p>Opening Balance for Month:</p><p class="text-right font-medium">${formatCurrency(data.openingBalanceForMonth)}</p>` : ''}
-                                <p>Total Gross Commission:</p><p class="text-right font-medium">${formatCurrency(data.totalGrossCommission || 0)}</p>
-                                <p>Total Head Office Deduction:</p><p class="text-right font-medium">${formatCurrency(data.totalHeadOfficeDeduction || 0)}</p>
-                                <p>Total Taxable Amount:</p><p class="text-right font-medium">${formatCurrency(data.totalTaxableAmount || 0)}</p>
-                                <p>Total Tax Deduction:</p><p class="text-right font-medium">${formatCurrency(data.totalTaxDeduction || 0)}</p>
-                                <p class="font-bold">Total Net Commission for Month:</p><p class="text-right font-bold">${formatCurrency(data.totalNetCommission || 0)}</p>
-                                ${data.totalPaymentsMade !== undefined ? `<p>Total Payments Made:</p><p class="text-right font-medium">${formatCurrency(data.totalPaymentsMade)}</p>` : ''}
-                                ${data.closingBalanceForMonth !== undefined ? `<p class="font-bold text-blue-600">Closing Balance for Month:</p><p class="text-right font-bold text-blue-600">${formatCurrency(data.closingBalanceForMonth)}</p>` : ''}
-                            </div>
-                         </div>`;
-                if (type === 'monthlyAggregation' && data.dailySummaries && data.dailySummaries.length > 0) {
-                    html += `<h4 class="text-lg font-semibold mt-4 mb-2">Daily Breakdown:</h4>`;
-                    data.dailySummaries.forEach(daily => {
-                        html += `<div class="mb-3 p-2 border rounded">
-                                    <strong>${formatDate(daily.date)}:</strong> Net Commission: ${formatCurrency(daily.netCommission || 0)} (Gross: ${formatCurrency(daily.totalGrossCommission || 0)})
-                                 </div>`;
-                    });
-                }
-            }
-            html += `<div class="mt-6 text-xs text-gray-500 print-footer">${DEVELOPER_INFO}</div>`;
-            html += `</div>`; 
-            reportContentDiv.innerHTML = html;
-        };
-
-        const handleDeleteReport = () => {
-            if(!deleteReportButton) return;
-            const reportId = deleteReportButton.getAttribute('data-report-id');
-            const reportType = deleteReportButton.getAttribute('data-report-type');
-
-            if (!reportId || !reportType) {
-                showToast("Cannot identify report to delete.", "error");
-                return;
-            }
-
-            promptPassword(async () => {
-                if (!userId || !db) return;
-                showToast(`Deleting ${reportType} report: ${reportId}...`, "info");
-                try {
-                    if (reportType === 'daily') {
-                        const summaryRef = doc(db, getDailySummariesCollectionPath(), reportId);
-                        const summarySnap = await getDoc(summaryRef);
-                        if (!summarySnap.exists()) {
-                            showToast("Report already deleted or not found.", "warning");
-                            clearReportContent();
-                            return;
-                        }
-                        const deletedNetCommission = summarySnap.data().netCommission || 0;
-                        
-                        const batch = writeBatch(db);
-                        batch.delete(summaryRef);
-                        
-                        const newOverallBalance = currentBalance - deletedNetCommission;
-                        batch.update(doc(db, getAppStateDocPath()), { currentBalance: newOverallBalance });
-                        
-                        await batch.commit();
-
-                        currentBalance = newOverallBalance;
-                        updateBalanceDisplay();
-                        showToast(`Daily report ${reportId} deleted. Balance updated.`, "success");
-                        clearReportContent();
-
-                    } else if (reportType === 'monthly') { 
-                        const summaryRef = doc(db, getMonthlySummariesCollectionPath(), reportId);
-                        await deleteDoc(summaryRef);
-                        showToast(`Monthly summary ${reportId} deleted. Note: This does not delete individual daily records or adjust balance automatically. Recalculate if needed.`, "success");
-                        clearReportContent();
-                    }
-                } catch (error) {
-                    console.error(`Error deleting ${reportType} report:`, error);
-                    showToast(`Error deleting report: ${error.message}`, "error");
-                }
-            });
-        };
-
-        // --- PAYMENT REQUESTS FUNCTIONS ---
-        const loadPaymentRequests = async () => {
-            if (!userId || !db || !prListDiv) return;
-            prListDiv.innerHTML = '<p class="text-gray-500">Loading payment requests...</p>';
-            try {
-                const q = query(collection(db, getPaymentRequestsCollectionPath())); 
-                const querySnapshot = await getDocs(q);
-                const requests = [];
-                querySnapshot.forEach((doc) => {
-                    requests.push({ id: doc.id, ...doc.data() });
-                });
-                requests.sort((a, b) => new Date(b.requestDate) - new Date(a.requestDate));
-                renderPaymentRequests(requests);
-            } catch (error) {
-                console.error("Error loading payment requests:", error);
-                prListDiv.innerHTML = '<p class="text-red-500">Failed to load payment requests.</p>';
-                showToast("Error loading payment requests.", "error");
-            }
-        };
-
-        const renderPaymentRequests = (requests) => {
-            if (!prListDiv) return;
-            prListDiv.innerHTML = '';
-            if (requests.length === 0) {
-                prListDiv.innerHTML = '<p class="text-gray-500">No payment requests found.</p>';
-                return;
-            }
-            const ul = document.createElement('ul');
-            ul.className = 'space-y-3';
-            requests.forEach(req => {
-                const li = document.createElement('li');
-                li.className = 'p-3 border rounded-md bg-white shadow-sm';
-                let statusColor = 'text-yellow-600';
-                if (req.status === 'Approved') statusColor = 'text-blue-600';
-                if (req.status === 'Paid') statusColor = 'text-green-600';
-
-                li.innerHTML = `
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="font-semibold">Requested: ${formatCurrency(req.requestedAmount)} on ${formatDate(req.requestDate)}</p>
-                            <p class="text-sm ${statusColor}">Status: ${req.status}</p>
-                            ${req.approvedAmount ? `<p class="text-sm">Approved: ${formatCurrency(req.approvedAmount)} ${req.approvalDate ? `on ${formatDate(req.approvalDate)}` : ''}</p>` : ''}
-                            ${req.paidAmount ? `<p class="text-sm">Paid: ${formatCurrency(req.paidAmount)} ${req.paymentDate ? `on ${formatDate(req.paymentDate)}` : ''}</p>` : ''}
-                        </div>
-                        <div class="space-x-2 print-hidden">
-                            ${req.status === 'Pending' ? `<button data-id="${req.id}" class="approve-pr-btn px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">Approve</button>` : ''}
-                            ${req.status === 'Approved' ? `<button data-id="${req.id}" data-approved="${req.approvedAmount}" class="markpaid-pr-btn px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600">Mark Paid</button>` : ''}
-                            <button data-id="${req.id}" class="delete-pr-btn px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">Delete</button>
-                        </div>
-                    </div>
-                `;
-                ul.appendChild(li);
-            });
-            prListDiv.appendChild(ul);
-
-            document.querySelectorAll('.approve-pr-btn').forEach(btn => btn.addEventListener('click', handleApprovePR));
-            document.querySelectorAll('.markpaid-pr-btn').forEach(btn => btn.addEventListener('click', handleMarkPaidPR));
-            document.querySelectorAll('.delete-pr-btn').forEach(btn => btn.addEventListener('click', handleDeletePR));
-        };
-
-        const handleAddPaymentRequest = async () => {
-            if(!prDateInput || !prAmountInput) return;
-            const requestDate = prDateInput.value;
-            const requestedAmount = parseFloat(prAmountInput.value);
-
-            if (!requestDate || isNaN(requestedAmount) || requestedAmount <= 0) {
-                showToast("Please enter a valid date and requested amount.", "error");
-                return;
-            }
-            if (!userId || !db) return;
-
-            const newRequest = {
-                requestDate,
-                requestedAmount,
-                status: 'Pending', 
-                approvedAmount: null,
-                approvalDate: null,
-                paidAmount: null,
-                paymentDate: null,
-                createdAt: Timestamp.now()
-            };
-
-            try {
-                await addDoc(collection(db, getPaymentRequestsCollectionPath()), newRequest);
-                showToast("Payment request added successfully.", "success");
-                prAmountInput.value = ''; 
-                loadPaymentRequests(); 
-            } catch (error) {
-                console.error("Error adding payment request:", error);
-                showToast(`Error adding payment request: ${error.message}`, "error");
-            }
-        };
-
-        const handleApprovePR = (e) => {
-            const prId = e.target.getAttribute('data-id');
-            const approvalFormDiv = document.createElement('div');
-            approvalFormDiv.innerHTML = `
-                <label for="modalApprovedAmount" class="block text-sm font-medium text-gray-700">Approved Amount (PKR):</label>
-                <input type="number" id="modalApprovedAmount" step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                <p id="modalApprovalError" class="text-red-500 text-sm mt-1 hidden"></p>
-            `;
-            const actions = [{
-                label: 'Approve Payment',
-                className: 'px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600',
-                callback: async () => {
-                    const approvedAmountInputEl = document.getElementById('modalApprovedAmount');
-                    const errorEl = document.getElementById('modalApprovalError');
-                    if (!approvedAmountInputEl) return;
-
-                    const approvedAmount = parseFloat(approvedAmountInputEl.value);
-                    
-                    if (isNaN(approvedAmount) || approvedAmount <= 0) {
-                        if(errorEl) {
-                            errorEl.textContent = 'Please enter a valid positive amount.';
-                            errorEl.classList.remove('hidden');
-                        }
-                        // showToast('Invalid approved amount.', 'error'); // Toast is good, but modal should stay
-                        return; // Prevent modal from closing by not calling hideModal implicitly
-                    }
-                    if(errorEl) errorEl.classList.add('hidden');
-
-                    if (!userId || !db) return;
-                    try {
-                        const prRef = doc(db, getPaymentRequestsCollectionPath(), prId);
-                        
-                        const batch = writeBatch(db);
-                        batch.update(prRef, {
-                            approvedAmount: approvedAmount,
-                            status: 'Approved',
-                            approvalDate: formatDate(new Date())
-                        });
-
-                        const newOverallBalance = currentBalance - approvedAmount;
-                        batch.update(doc(db, getAppStateDocPath()), { currentBalance: newOverallBalance });
-                        
-                        await batch.commit();
-
-                        currentBalance = newOverallBalance;
-                        updateBalanceDisplay();
-                        showToast(`Payment request approved for ${formatCurrency(approvedAmount)}. Balance updated.`, "success");
-                        loadPaymentRequests();
-                        // hideModal() is called by showModal wrapper if this callback doesn't prevent it
-                    } catch (error) {
-                        console.error("Error approving payment request:", error);
-                        showToast(`Error approving: ${error.message}`, "error");
-                    }
-                }
-            }];
-            showModal('Approve Payment Request', approvalFormDiv, actions);
-        };
-        
-        const handleMarkPaidPR = async (e) => {
-            const prId = e.target.getAttribute('data-id');
-            const approvedAmount = parseFloat(e.target.getAttribute('data-approved')); 
-
-            const paidFormDiv = document.createElement('div');
-            paidFormDiv.innerHTML = `
-                <p class="mb-2">Approved amount was ${formatCurrency(approvedAmount)}.</p>
-                <label for="modalPaidAmount" class="block text-sm font-medium text-gray-700">Paid Amount (PKR):</label>
-                <input type="number" id="modalPaidAmount" step="0.01" value="${approvedAmount.toFixed(2)}" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                <p id="modalPaidError" class="text-red-500 text-sm mt-1 hidden"></p>
-            `;
-             const actions = [{
-                label: 'Mark as Paid',
-                className: 'px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600',
-                callback: async () => {
-                    const paidAmountInputEl = document.getElementById('modalPaidAmount');
-                    const errorEl = document.getElementById('modalPaidError');
-                    if(!paidAmountInputEl) return;
-
-                    const paidAmount = parseFloat(paidAmountInputEl.value);
-
-                    if (isNaN(paidAmount) || paidAmount <= 0) {
-                         if(errorEl) {
-                            errorEl.textContent = 'Please enter a valid positive paid amount.';
-                            errorEl.classList.remove('hidden');
-                        }
-                        return; 
-                    }
-                     if(errorEl) errorEl.classList.add('hidden');
-
-                    if (!userId || !db) return;
-                    try {
-                        const prRef = doc(db, getPaymentRequestsCollectionPath(), prId);
-                        await updateDoc(prRef, {
-                            paidAmount: paidAmount,
-                            status: 'Paid',
-                            paymentDate: formatDate(new Date())
-                        });
-                        showToast("Payment request marked as Paid.", "success");
-                        loadPaymentRequests();
-                    } catch (error) {
-                        console.error("Error marking as paid:", error);
-                        showToast(`Error: ${error.message}`, "error");
-                    }
-                }
-            }];
-            showModal('Mark Payment as Paid', paidFormDiv, actions);
-        };
-
-        const handleDeletePR = (e) => {
-            const prId = e.target.getAttribute('data-id');
-            showModal(
-                'Confirm Deletion',
-                'Are you sure you want to delete this payment request? This action cannot be undone. If it was an approved request, the balance will NOT be automatically readjusted.',
-                [{
-                    label: 'Delete',
-                    className: 'px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700',
-                    callback: async () => {
-                         if (!userId || !db) return;
-                        try {
-                            const prRef = doc(db, getPaymentRequestsCollectionPath(), prId);
-                            const prSnap = await getDoc(prRef);
-                            if (prSnap.exists() && prSnap.data().status === 'Approved' && (prSnap.data().approvedAmount || 0) > 0) {
-                                showToast("Warning: Deleting an approved request. Balance was already deducted. Manual adjustment might be needed if this is an error.", "warning");
-                            }
-                            await deleteDoc(prRef);
-                            showToast("Payment request deleted.", "success");
-                            loadPaymentRequests();
-                        } catch (error) {
-                            console.error("Error deleting payment request:", error);
-                            showToast(`Error deleting: ${error.message}`, "error");
-                        }
-                    }
-                }]
-            );
-        };
-
-        // --- MONTH CLOSURE FUNCTIONS ---
-        const clearMonthClosureReport = () => {
-            if(mcReportDiv) mcReportDiv.innerHTML = '<p class="text-gray-500">Select month to generate summary.</p>';
-        };
-        
-        const handleCloseMonth = async () => {
-            if(!mcMonthInput) return;
-            const monthYearToClose = mcMonthInput.value; 
-            if (!monthYearToClose) {
-                showToast("Please select a month to close.", "warning");
-                return;
-            }
-            if (!userId || !db) return;
-
-            showModal(
-                'Confirm Month Closure',
-                `Are you sure you want to close month ${monthYearToClose}? This will generate a summary. This action doesn't prevent further entries for this month but marks a point-in-time summary.`,
-                [{
-                    label: 'Close Month',
-                    className: 'px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700',
-                    callback: async () => {
-                        if(!mcReportDiv) return;
-                        mcReportDiv.innerHTML = `<p class="text-gray-500">Generating summary for ${monthYearToClose}...</p>`;
-                        try {
-                            const dailyQuery = query(collection(db, getDailySummariesCollectionPath()), where("monthYear", "==", monthYearToClose));
-                            const dailySnapshots = await getDocs(dailyQuery);
-
-                            if (dailySnapshots.empty) {
-                                mcReportDiv.innerHTML = `<p class="text-red-500">No daily data found for ${monthYearToClose} to generate a summary.</p>`;
-                                showToast(`No data for ${monthYearToClose}.`, "warning");
-                                return;
-                            }
-
-                            let monthlySummaryData = {
-                                monthYear: monthYearToClose,
-                                totalGrossCommission: 0,
-                                totalHeadOfficeDeduction: 0,
-                                totalTaxableAmount: 0,
-                                totalTaxDeduction: 0,
-                                totalNetCommission: 0,
-                                totalPaymentsMade: 0, 
-                                dailySummaryCount: dailySnapshots.size,
-                                closedAt: Timestamp.now(),
-                                openingBalanceForMonth: 0, // Will be calculated
-                                closingBalanceForMonth: 0 // Will be calculated
-                            };
-
-                            dailySnapshots.forEach(docSnap => {
-                                const dailyData = docSnap.data();
-                                monthlySummaryData.totalGrossCommission += dailyData.totalGrossCommission || 0;
-                                monthlySummaryData.totalHeadOfficeDeduction += dailyData.headOfficeDeduction || 0;
-                                monthlySummaryData.totalTaxableAmount += dailyData.taxableAmount || 0;
-                                monthlySummaryData.totalTaxDeduction += dailyData.taxDeduction || 0;
-                                monthlySummaryData.totalNetCommission += dailyData.netCommission || 0;
-                            });
-
-                            const paymentsQuery = query(collection(db, getPaymentRequestsCollectionPath()), 
-                                where("status", "in", ["Approved", "Paid"])
-                            );
-                            const paymentSnapshots = await getDocs(paymentsQuery);
-                            paymentSnapshots.forEach(docSnap => {
-                                const prData = docSnap.data();
-                                const prApprovalMonthYear = prData.approvalDate ? getMonthYear(prData.approvalDate) : null;
-                                if (prApprovalMonthYear === monthYearToClose && (prData.approvedAmount || 0) > 0) {
-                                    monthlySummaryData.totalPaymentsMade += prData.approvedAmount;
-                                }
-                            });
-                            
-                            const prevMonth = getPreviousMonthYear(monthYearToClose);
-                            let calculatedOpeningBalance = 0;
-                            if (prevMonth) {
-                                const prevMonthSummarySnap = await getDoc(doc(db, getMonthlySummariesCollectionPath(), prevMonth));
-                                if (prevMonthSummarySnap.exists()) {
-                                    calculatedOpeningBalance = prevMonthSummarySnap.data().closingBalanceForMonth || 0;
-                                }
-                            } else {
-                                // For the very first month, try to derive from appState if it was the absolute beginning
-                                // This is an approximation. A more robust system might require explicit opening balance entry for the first month.
-                                const appStateSnap = await getDoc(doc(db, getAppStateDocPath()));
-                                if (appStateSnap.exists() && !appStateSnap.data().lastMonthClosed) { // if no month ever closed
-                                     // Opening balance for the very first month is current balance minus this month's earnings plus this month's payments
-                                     calculatedOpeningBalance = currentBalance - monthlySummaryData.totalNetCommission + monthlySummaryData.totalPaymentsMade;
-                                }
-                            }
-                            monthlySummaryData.openingBalanceForMonth = calculatedOpeningBalance;
-                            monthlySummaryData.closingBalanceForMonth = calculatedOpeningBalance + monthlySummaryData.totalNetCommission - monthlySummaryData.totalPaymentsMade;
-
-                            await setDoc(doc(db, getMonthlySummariesCollectionPath(), monthYearToClose), monthlySummaryData);
-                            await updateAppState({ lastMonthClosed: monthYearToClose });
-
-                            mcReportDiv.innerHTML = `
-                                <h4 class="text-lg font-semibold">Month Closure Summary for ${monthYearToClose}</h4>
-                                <p>Total Daily Records Processed: ${monthlySummaryData.dailySummaryCount}</p>
-                                <p>Total Gross Commission: ${formatCurrency(monthlySummaryData.totalGrossCommission)}</p>
-                                <p>Total Net Commission: ${formatCurrency(monthlySummaryData.totalNetCommission)}</p>
-                                <p>Total Payments (Approved this month): ${formatCurrency(monthlySummaryData.totalPaymentsMade)}</p>
-                                <p>Calculated Opening Balance for Month: ${formatCurrency(monthlySummaryData.openingBalanceForMonth)}</p>
-                                <p>Calculated Closing Balance for Month: ${formatCurrency(monthlySummaryData.closingBalanceForMonth)}</p>
-                                <p class="mt-2 text-green-600">Month ${monthYearToClose} summary generated and saved.</p>
-                            `;
-                            showToast(`Month ${monthYearToClose} closed successfully.`, "success");
-
-                        } catch (error) {
-                            console.error("Error during month closure:", error);
-                            mcReportDiv.innerHTML = `<p class="text-red-500">Error closing month: ${error.message}</p>`;
-                            showToast(`Error closing month: ${error.message}`, "error");
-                        }
-                    }
-                }]
-            );
-        };
-        
-        const getPreviousMonthYear = (monthYear) => { 
-            const [year, month] = monthYear.split('-').map(Number);
-            let prevYear = year;
-            let prevMonth = month - 1;
-            if (prevMonth === 0) {
-                prevMonth = 12;
-                prevYear--;
-            }
-            if (prevYear < 1900) return null; 
-            return `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-        };
-
-        // --- LOGIN & LOGOUT ---
-        const handleLogin = async (event) => {
-            event.preventDefault();
-            if(!usernameInput || !passwordInput) return;
-
-            const username = usernameInput.value;
-            const pass = passwordInput.value;
-
-            if (username === LOGIN_USERNAME && pass === LOGIN_PASSWORD) {
-                if(loginError) loginError.classList.add('hidden');
-                
-                const firebaseReady = await initializeFirebase();
-                if (firebaseReady && userId) { 
-                    if(loginSection) loginSection.classList.add('hidden');
-                    if(appSection) appSection.classList.remove('hidden');
-                    
-                    switchView('dashboard'); 
-
-                    if(mainHeaderTitleEl) mainHeaderTitleEl.textContent = APP_NAME;
-                    // The problematic line for 'mainHeaderSubtitle' is removed.
-                    // switchView handles setting the subtitle on currentViewTitle.
-                    if(footerDevInfoP) footerDevInfoP.textContent = DEVELOPER_INFO;
-
-                } else {
-                    if (loginError) { 
-                        if (!loginError.textContent || loginError.textContent.trim() === "") { // Check if already has a message from firebase init
-                            loginError.textContent = "Authentication with services failed. Please check your connection or configuration.";
-                        }
-                        loginError.classList.remove('hidden');
-                    } else {
-                        console.error("loginError element not found, but an auth error occurred.");
-                    }
-                }
-            } else {
-                if (loginError) { 
-                    loginError.textContent = "Invalid username or password.";
-                    loginError.classList.remove('hidden');
-                } else {
-                    console.error("loginError element not found, but an invalid login attempt occurred.");
-                }
-            }
-        };
-
-        const handleLogout = () => {
-            showModal(
-                'Confirm Logout',
-                'Are you sure you want to logout? Any unsaved data on the current screen might be lost.',
-                [{
-                    label: 'Logout',
-                    className: 'px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700',
-                    callback: () => {
-                        if(appSection) appSection.classList.add('hidden');
-                        if(loginSection) loginSection.classList.remove('hidden');
-                        currentView = 'login';
-                        if(usernameInput) usernameInput.value = '';
-                        if(passwordInput) passwordInput.value = '';
-                        if(loginError) loginError.classList.add('hidden');
-                    }
-                }]
-            );
-        };
-        
-        // --- SVG ICONS ---
-        const eyeIconSVG = () => `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>`;
-        const eyeSlashIconSVG = () => `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>`;
-
-
-        // --- INITIALIZATION ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // Assign DOM elements
-            loginSection = document.getElementById('loginSection');
-            appSection = document.getElementById('appSection');
-            mainContent = document.getElementById('mainContent');
-            sidebar = document.getElementById('sidebar');
-            usernameInput = document.getElementById('username');
-            passwordInput = document.getElementById('password');
-            loginError = document.getElementById('loginError');
-            
-            currentViewTitle = document.getElementById('currentViewTitle');
-            currentDateDisplay = document.getElementById('currentDateDisplay');
-            mainHeaderTitleEl = document.getElementById('mainHeaderTitle');
-            footerDevInfoP = document.getElementById('footerDevInfo');  
-            loginDevInfoP = document.getElementById('loginDevInfo');    
-
-            if(loginDevInfoP) loginDevInfoP.textContent = DEVELOPER_INFO;
-
-
-            // Dashboard elements
-            stockNameInput = document.getElementById('stockName');
-            quantityInput = document.getElementById('quantity');
-            rateInput = document.getElementById('rate');
-            addEntryButton = document.getElementById('addEntryButton');
-            entriesTableBody = document.getElementById('entriesTableBody');
-            dailySummaryDiv = document.getElementById('dailySummaryDiv');
-            dashboardDateInput = document.getElementById('dashboardDateInput');
-            totalGrossCommissionEl = document.getElementById('totalGrossCommission');
-            headOfficeDeductionEl = document.getElementById('headOfficeDeduction');
-            taxableAmountEl = document.getElementById('taxableAmount');
-            taxDeductionEl = document.getElementById('taxDeduction');
-            netCommissionEl = document.getElementById('netCommission');
-            previousBalanceEl = document.getElementById('previousBalance');
-            currentDayNetCommissionEl = document.getElementById('currentDayNetCommission');
-            newBalanceEl = document.getElementById('newBalance');
-            saveDayButton = document.getElementById('saveDayButton');
-            printDayButton = document.getElementById('printDayButton'); 
-            balanceDisplayEl = document.getElementById('balanceDisplay');
-            toggleBalanceButton = document.getElementById('toggleBalanceButton');
-            
-            // Report elements
-            reportDateInput = document.getElementById('reportDateInput');
-            reportMonthInput = document.getElementById('reportMonthInput');
-            viewDateReportButton = document.getElementById('viewDateReportButton');
-            viewMonthReportButton = document.getElementById('viewMonthReportButton');
-            reportContentDiv = document.getElementById('reportContentDiv');
-            deleteReportButton = document.getElementById('deleteReportButton');
-
-            // Payment elements
-            prDateInput = document.getElementById('prDateInput');
-            prAmountInput = document.getElementById('prAmountInput');
-            prAddButton = document.getElementById('prAddButton');
-            prListDiv = document.getElementById('prListDiv');
-            
-            // Month Closure elements
-            mcMonthInput = document.getElementById('mcMonthInput');
-            mcCloseMonthButton = document.getElementById('mcCloseMonthButton');
-            mcReportDiv = document.getElementById('mcReportDiv');
-
-            // Modal elements
-            modal = document.getElementById('appModal');
-            modalCloseButton = document.getElementById('modalCloseButton');
-            modalTitle = document.getElementById('modalTitle');
-            modalBody = document.getElementById('modalBody');
-            modalActions = document.getElementById('modalActions');
-
-
-            // Event Listeners
-            const loginForm = document.getElementById('loginForm');
-            if(loginForm) loginForm.addEventListener('submit', handleLogin);
-            
-            const logoutBtn = document.getElementById('logoutButton');
-            if(logoutBtn) logoutBtn.addEventListener('click', handleLogout);
-
-            if(sidebar) {
-                sidebar.querySelectorAll('a').forEach(link => {
-                    link.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        const viewName = link.getAttribute('data-view');
-                        if (viewName) switchView(viewName);
-                    });
-                });
-            }
-
-            if (addEntryButton) addEntryButton.addEventListener('click', handleAddEntry);
-            if (saveDayButton) saveDayButton.addEventListener('click', handleSaveDay);
-            
-            const reportPrintButton = document.getElementById('reportPrintButton');
-            if (reportPrintButton) reportPrintButton.addEventListener('click', handlePrintDay); 
-            if (printDayButton) printDayButton.addEventListener('click', handlePrintDay); 
-
-            if (dashboardDateInput) {
-                dashboardDateInput.value = selectedDate; 
-                dashboardDateInput.addEventListener('change', (e) => {
-                    selectedDate = e.target.value;
-                    loadDashboardData(); 
-                });
-            }
-            if (toggleBalanceButton) {
-                toggleBalanceButton.innerHTML = balanceVisible ? eyeIconSVG() : eyeSlashIconSVG();
-                toggleBalanceButton.addEventListener('click', toggleBalanceVisibility);
-            }
-            
-            if (viewDateReportButton) viewDateReportButton.addEventListener('click', viewDailyReport);
-            if (viewMonthReportButton) viewMonthReportButton.addEventListener('click', viewMonthlyReport);
-            if (deleteReportButton) deleteReportButton.addEventListener('click', handleDeleteReport);
-
-            if (prAddButton) prAddButton.addEventListener('click', handleAddPaymentRequest);
-            if (prDateInput) prDateInput.value = formatDate(new Date()); 
-
-            if (mcCloseMonthButton) mcCloseMonthButton.addEventListener('click', handleCloseMonth);
-            if (mcMonthInput) mcMonthInput.value = getMonthYear(new Date()); 
-
-            if(modalCloseButton) modalCloseButton.addEventListener('click', hideModal);
-            
-            // Set initial UI state
-            if(loginSection) loginSection.classList.remove('hidden');
-            if(appSection) appSection.classList.add('hidden');
-            if(modal) modal.classList.add('hidden'); 
-            const toastNotification = document.getElementById('toastNotification');
-            if(toastNotification) toastNotification.classList.add('hidden','opacity-0');
-        });
-
-    </script>
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .sidebar-link { @apply block py-2.5 px-4 rounded transition duration-200; }
-        .sidebar-link:hover { @apply bg-gray-700 text-white; }
-        .sidebar-link.active { @apply bg-gray-900 text-white; } /* Note: Tailwind might prefer bg-gray-700 for active if sidebar is bg-gray-800 */
-        
-        /* Print specific styles */
+        /* General body styling */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* Light gray background */
+            color: #333; /* Dark gray text */
+        }
+
+        /* Navigation styling */
+        nav {
+            background-color: #1a3b5d; /* Darson blue */
+            color: white;
+        }
+        nav a, nav button {
+            transition: background-color 0.3s ease, color 0.3s ease;
+            border-radius: 0.375rem; /* md */
+        }
+        nav a:hover, nav button:hover, nav a.active, nav button.active {
+            background-color: #2a5282; /* Slightly lighter blue */
+            color: #e0f2fe; /* Light cyan */
+        }
+        .nav-icon {
+            margin-right: 0.5rem; /* space between icon and text */
+        }
+
+        /* Page container styling */
+        .page-container {
+            background-color: white;
+            border-radius: 0.75rem; /* lg */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* Tailwind shadow-lg */
+            padding: 1.5rem; /* p-6 */
+            margin-top: 1.5rem; /* mt-6 */
+        }
+        .page-title {
+            color: #1a3b5d; /* Darson blue */
+            border-bottom: 2px solid #2a5282;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Form elements styling */
+        input[type="text"], input[type="number"], input[type="date"], input[type="password"], select, textarea {
+            border: 1px solid #cbd5e1; /* cool-gray-300 */
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem; /* md */
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            width: 100%;
+        }
+        input[type="text"]:focus, input[type="number"]:focus, input[type="date"]:focus, input[type="password"]:focus, select:focus, textarea:focus {
+            border-color: #2a5282; /* Darson blue */
+            box-shadow: 0 0 0 3px rgba(42, 82, 130, 0.2); /* Darson blue focus ring */
+            outline: none;
+        }
+        label {
+            font-weight: 500; /* medium */
+            color: #4a5568; /* cool-gray-700 */
+        }
+
+        /* Button styling */
+        .btn {
+            padding: 0.625rem 1.25rem; /* py-2.5 px-5 */
+            border-radius: 0.375rem; /* md */
+            font-weight: 500; /* medium */
+            transition: background-color 0.3s ease, transform 0.1s ease;
+            cursor: pointer;
+            text-align: center;
+        }
+        .btn-primary {
+            background-color: #1a3b5d; /* Darson blue */
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2a5282; /* Lighter Darson blue */
+            transform: translateY(-1px);
+        }
+        .btn-secondary {
+            background-color: #e2e8f0; /* cool-gray-200 */
+            color: #1a3b5d; /* Darson blue */
+            border: 1px solid #cbd5e1; /* cool-gray-300 */
+        }
+        .btn-secondary:hover {
+            background-color: #cbd5e1; /* cool-gray-300 */
+            transform: translateY(-1px);
+        }
+        .btn-danger {
+            background-color: #e53e3e; /* red-600 */
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c53030; /* red-700 */
+            transform: translateY(-1px);
+        }
+        .btn-icon {
+            padding: 0.5rem;
+        }
+
+        /* Table styling */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 0.75rem 1rem; /* py-3 px-4 */
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0; /* cool-gray-200 */
+        }
+        th {
+            background-color: #f8fafc; /* cool-gray-50 */
+            font-weight: 600; /* semibold */
+            color: #374151; /* cool-gray-700 */
+        }
+        tbody tr:hover {
+            background-color: #f9fafb; /* cool-gray-50 slightly different for hover */
+        }
+
+        /* Modal styling */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            overflow-y: auto; /* For long modals */
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem; /* lg */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); /* shadow-2xl */
+            width: 90%;
+            max-width: 500px; /* Default max-width */
+        }
+        .modal-content.modal-lg { /* For larger modals like image preview */
+            max-width: 800px; 
+        }
+        .modal-title {
+            font-size: 1.25rem; /* xl */
+            font-weight: 600; /* semibold */
+            margin-bottom: 1rem;
+            color: #1a3b5d;
+        }
+
+        /* Print-specific styles */
         @media print {
             body {
-                font-size: 10pt;
+                background-color: white;
+                color: black;
+                font-size: 10pt; /* Smaller font for print */
                 margin: 0;
                 padding: 0;
-                background-color: white !important; /* Ensure white background for printing */
-                -webkit-print-color-adjust: exact; /* Chrome, Safari */
-                print-color-adjust: exact; /* Firefox, Edge */
             }
-            #loginSection, #sidebar, #appHeader, .print-hidden, #toastNotification, #appModal {
+            nav, .no-print, #sidebar {
                 display: none !important;
             }
-            #appSection, #mainContent, #mainContent > div[data-view] {
-                display: block !important;
+            .page-container {
+                box-shadow: none;
+                border: none;
+                padding: 0;
+                margin: 0;
                 width: 100% !important;
-                height: auto !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                overflow: visible !important;
-                background-color: white !important;
+                max-width: 100% !important;
             }
-            .printable-area, .print-this-section { 
+            .print-header {
                 display: block !important;
-                width: 100% !important;
-                margin: 0 auto;
-                padding: 5mm 10mm; /* Reduced padding for print */
-                border: none !important;
-                box-shadow: none !important;
-                page-break-inside: avoid;
-                background-color: white !important;
+                text-align: center;
+                margin-bottom: 20px;
             }
-             #view-dashboard.print-this-section { /* Specific for dashboard */
-                padding: 5mm; /* Minimal padding for dashboard print */
+            .print-header h1 {
+                font-size: 18pt;
+                font-weight: bold;
+                margin: 0;
+                color: black !important;
             }
-            .print-header, .print-footer {
-                display: block !important; 
-            }
-            .report-table-container {
-                max-height: none !important; /* Allow table to expand */
-                overflow: visible !important;
-            }
-            .report-table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 9pt; /* Slightly smaller font for tables in print */
-            }
-            .report-table th, .report-table td {
-                border: 1px solid #ccc !important;
-                padding: 3px;
-                text-align: left;
-            }
-            .report-table th { 
-                background-color: #f0f0f0 !important; 
-                -webkit-print-color-adjust: exact; print-color-adjust: exact; 
-            }
-            .report-summary { 
-                background-color: #f9f9f9 !important; 
-                -webkit-print-color-adjust: exact; print-color-adjust: exact; 
-                margin-top: 10px; /* Add some space before summary */
-                padding: 10px;
-            }
-            .report-summary .grid {
-                font-size: 9pt;
-            }
-
-
-            @page {
-                size: A4; 
-                margin: 10mm; 
-            }
-            
-            #view-dashboard .lg\:col-span-1, #view-dashboard .lg\:col-span-2 { /* Reset columns for print */
-                grid-column: span 3 / span 3 !important; 
-            }
-            #view-dashboard .lg\:grid-cols-3 {
-                 display: block !important; /* Stack elements for print */
-            }
-            #view-dashboard .bg-white.p-6.rounded-lg.shadow { /* Entry form and entries list container */
-                padding: 0 !important;
-                box-shadow: none !important;
-                border: none !important;
-                margin-bottom: 10px; /* Space between stacked sections */
-            }
-             #view-dashboard h3 { /* Reduce heading sizes for print */
+            .print-header h2 {
                 font-size: 14pt;
-                margin-bottom: 5px;
+                margin: 0;
+                color: black !important;
             }
-            #dailySummaryDiv h4 {
-                font-size: 12pt;
-                margin-bottom: 5px;
+            .print-header p {
+                font-size: 10pt;
+                margin: 5px 0;
+                color: black !important;
             }
+            .print-footer {
+                display: block !important;
+                text-align: center;
+                font-size: 8pt;
+                position: fixed;
+                bottom: 10px;
+                width: 100%;
+                color: black !important;
+            }
+            table {
+                font-size: 9pt;
+                border: 1px solid #ccc; /* Add borders for tables in print */
+            }
+            th, td {
+                border: 1px solid #ccc;
+                padding: 4px 6px;
+            }
+            th {
+                background-color: #eee !important; /* Light gray for table headers */
+                color: black !important;
+            }
+            a {
+                text-decoration: none;
+                color: black;
+            }
+            img {
+                max-width: 100% !important; /* Ensure images fit */
+                page-break-inside: avoid;
+            }
+            .page-break-before {
+                page-break-before: always;
+            }
+            .page-break-after {
+                page-break-after: always;
+            }
+            /* Optimize content per page */
+            @page {
+                size: A4;
+                margin: 0.75in;
+            }
+        }
+        .print-header, .print-footer {
+            display: none; /* Hidden by default, shown by print styles */
         }
     </style>
 </head>
 <body class="bg-gray-100">
-
-    <section id="loginSection" class="min-h-screen flex items-center justify-center bg-gray-200">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
-            <div class="text-center mb-6">
-                <h1 class="text-3xl font-bold text-gray-800">Darson Securities Limited</h1>
-                <p class="text-gray-600">Brokerage Commission Software</p>
-            </div>
-            <form id="loginForm">
-                <div class="mb-4">
-                    <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
-                    <input type="text" id="username" value="DARSON" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+    <div id="app" class="flex flex-col min-h-screen">
+        <!-- Navigation -->
+        <nav id="sidebar" class="p-4 shadow-md">
+            <div class="container mx-auto flex flex-wrap items-center justify-between">
+                <div class="text-2xl font-bold">Darson Securities</div>
+                <button id="mobileMenuButton" class="md:hidden p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div id="navLinks" class="hidden md:flex md:items-center md:space-x-3 w-full md:w-auto mt-4 md:mt-0">
+                    <a href="#" class="block md:inline-block px-3 py-2 active" data-page="dashboard"><i class="fas fa-tachometer-alt nav-icon"></i>Dashboard</a>
+                    <a href="#" class="block md:inline-block px-3 py-2" data-page="reports"><i class="fas fa-chart-line nav-icon"></i>Reports</a>
+                    <a href="#" class="block md:inline-block px-3 py-2" data-page="balanceTracking"><i class="fas fa-balance-scale nav-icon"></i>Balance Tracking</a>
+                    <a href="#" class="block md:inline-block px-3 py-2" data-page="paymentRequests"><i class="fas fa-file-invoice-dollar nav-icon"></i>Payment Requests</a>
+                    <a href="#" class="block md:inline-block px-3 py-2" data-page="courierTracking"><i class="fas fa-truck nav-icon"></i>Courier Tracking</a>
+                    <a href="#" class="block md:inline-block px-3 py-2" data-page="branchBudget"><i class="fas fa-landmark nav-icon"></i>Branch Budget</a>
                 </div>
-                <div class="mb-6">
-                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" id="password" value="AFRASIAB" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
-                </div>
-                <p id="loginError" class="text-red-500 text-sm mb-4 hidden"></p>
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline transition duration-150">Login</button>
-            </form>
-            <p class="text-center text-xs text-gray-500 mt-8" id="loginDevInfo"></p>
-        </div>
-    </section>
-
-    <section id="appSection" class="hidden h-screen flex">
-        <aside id="sidebar" class="w-64 bg-gray-800 text-white p-4 space-y-2 print-hidden">
-            <h2 class="text-2xl font-semibold mb-6 text-center">DSL</h2>
-            <nav>
-                <a href="#" data-view="dashboard" class="sidebar-link active">Dashboard</a>
-                <a href="#" data-view="dailyReports" class="sidebar-link">Daily Reports</a>
-                <a href="#" data-view="monthlyReports" class="sidebar-link">Monthly Reports</a>
-                <a href="#" data-view="paymentRequests" class="sidebar-link">Payment Requests</a>
-                <a href="#" data-view="monthClosure" class="sidebar-link">Month Closure</a>
-            </nav>
-            <div class="absolute bottom-4 left-4 right-4">
-                <button id="logoutButton" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md">Logout</button>
             </div>
-        </aside>
+        </nav>
 
-        <main class="flex-1 flex flex-col overflow-hidden">
-            <header id="appHeader" class="bg-white shadow-md p-4 print-hidden">
-                <div class="flex justify-between items-center">
+        <!-- Main Content Area -->
+        <main class="container mx-auto p-4 flex-grow">
+            <!-- Print Header (for all printable sections) -->
+            <div class="print-header">
+                <h1>Darson Securities Limited</h1>
+                <h2 id="printReportTitle">Commission Report</h2>
+                <p>Date: <span id="printReportDate"></span></p>
+            </div>
+
+            <!-- Dashboard Page -->
+            <div id="dashboardPage" class="page-container">
+                <h2 class="text-2xl font-semibold mb-6 page-title">Commission Calculator</h2>
+                
+                <div class="mb-6 p-4 border rounded-lg bg-indigo-50">
+                    <h3 class="text-lg font-semibold mb-2 text-indigo-700">Select Date for Transactions</h3>
+                    <div class="flex flex-col sm:flex-row gap-4 items-end">
+                        <div class="flex-grow">
+                            <label for="dashboardDateInput" class="block text-sm font-medium text-gray-700">Transaction Date:</label>
+                            <input type="date" id="dashboardDateInput" class="mt-1 p-2 border rounded-md w-full">
+                        </div>
+                        <button id="loadDashboardDateBtn" class="btn btn-primary w-full sm:w-auto"><i class="fas fa-calendar-day mr-2"></i>Load/Refresh for Selected Date</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     <div>
-                        <h1 id="mainHeaderTitle" class="text-2xl font-bold text-gray-800"></h1>
-                        <p id="currentViewTitle" class="text-gray-600"></p>
+                        <label for="stockName" class="block text-sm font-medium text-gray-700">Stock Name</label>
+                        <input type="text" id="stockName" class="mt-1 p-2 border rounded-md w-full">
                     </div>
-                    <div class="text-right">
-                        <p id="currentDateDisplay" class="text-lg text-gray-700"></p>
-                        <div class="flex items-center justify-end mt-1">
-                            <span id="balanceDisplay" class="text-indigo-600 font-semibold mr-2">PKR ******</span>
-                            <button id="toggleBalanceButton" class="text-gray-500 hover:text-gray-700"></button>
-                        </div>
+                    <div>
+                        <label for="quantity" class="block text-sm font-medium text-gray-700">Quantity</label>
+                        <input type="number" id="quantity" class="mt-1 p-2 border rounded-md w-full" min="0">
                     </div>
-                </div>
-            </header>
-
-            <div id="mainContent" class="flex-1 p-6 overflow-y-auto bg-gray-50">
-                <div id="view-dashboard" data-view="dashboard" class="print-this-section">
-                     <div class="print-header text-center mb-4 hidden"> <h2 class="text-2xl font-bold">${APP_NAME}</h2>
-                        <p class="text-lg">${APP_SUBTITLE}</p>
-                        <p class="text-md dashboard-print-date">Date: </p> </div>
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow print-hidden"> <h3 class="text-xl font-semibold mb-4">Add Stock Entry</h3>
-                            <div class="mb-4">
-                                <label for="dashboardDateInput" class="block text-sm font-medium text-gray-700">Date</label>
-                                <input type="date" id="dashboardDateInput" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                            </div>
-                            <div class="mb-3">
-                                <label for="stockName" class="block text-sm font-medium text-gray-700">Stock Name</label>
-                                <input type="text" id="stockName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                            </div>
-                            <div class="mb-3">
-                                <label for="quantity" class="block text-sm font-medium text-gray-700">Quantity</label>
-                                <input type="number" id="quantity" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                            </div>
-                            <div class="mb-4">
-                                <label for="rate" class="block text-sm font-medium text-gray-700">Rate (PKR)</label>
-                                <input type="number" step="0.01" id="rate" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                            </div>
-                            <button id="addEntryButton" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md">Add Entry</button>
-                        </div>
-
-                        <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow">
-                            <h3 class="text-xl font-semibold mb-4">Today's Entries</h3>
-                            <div class="overflow-x-auto mb-4 max-h-96 report-table-container">
-                                <table class="w-full text-sm text-left text-gray-500 border-collapse border border-gray-300 report-table">
-                                    <thead class="text-xs text-gray-700 uppercase bg-gray-100">
-                                        <tr>
-                                            <th scope="col" class="px-4 py-2 border">#</th>
-                                            <th scope="col" class="px-4 py-2 border">Stock</th>
-                                            <th scope="col" class="px-4 py-2 border text-right">Qty</th>
-                                            <th scope="col" class="px-4 py-2 border text-right">Rate</th>
-                                            <th scope="col" class="px-4 py-2 border text-right">Comm/Share</th>
-                                            <th scope="col" class="px-4 py-2 border text-right">Total Comm.</th>
-                                            <th scope="col" class="px-4 py-2 border print-hidden">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="entriesTableBody">
-                                        <tr><td colspan="7" class="text-center py-4">No entries added yet.</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            <div id="dailySummaryDiv" class="mt-6 p-4 border border-gray-200 rounded-md bg-gray-50 report-summary">
-                                <h4 class="font-semibold text-lg mb-3">Daily Commission Summary</h4>
-                                <div class="space-y-1 text-sm">
-                                    <div class="flex justify-between"><span class="text-gray-600">Total Gross Commission:</span> <span id="totalGrossCommission" class="font-medium">PKR 0.00</span></div>
-                                    <div class="flex justify-between"><span class="text-gray-600">Head Office (40%):</span> <span id="headOfficeDeduction" class="font-medium text-red-500">PKR 0.00</span></div>
-                                    <div class="flex justify-between"><span class="text-gray-600">Amount Before Tax:</span> <span id="taxableAmount" class="font-medium">PKR 0.00</span></div>
-                                    <div class="flex justify-between"><span class="text-gray-600">Tax (12% on Rem.):</span> <span id="taxDeduction" class="font-medium text-red-500">PKR 0.00</span></div>
-                                    <hr class="my-2">
-                                    <div class="flex justify-between text-base"><span class="font-semibold">Net Commission for Day:</span> <span id="netCommission" class="font-bold text-green-600">PKR 0.00</span></div>
-                                    <hr class="my-2">
-                                    <div class="flex justify-between print-hidden"><span class="text-gray-600">Previous Balance:</span> <span id="previousBalance" class="font-medium">PKR 0.00</span></div>
-                                    <div class="flex justify-between print-hidden"><span class="text-gray-600">Today's Net Commission:</span> <span id="currentDayNetCommission" class="font-medium text-green-500">PKR 0.00</span></div>
-                                    <div class="flex justify-between text-lg print-hidden"><span class="font-semibold text-blue-600">New Estimated Balance:</span> <span id="newBalance" class="font-bold text-blue-700">PKR 0.00</span></div>
-                                </div>
-                            </div>
-                            <div class="mt-6 flex space-x-3 print-hidden">
-                                <button id="saveDayButton" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md">Save Day</button>
-                                <button id="printDayButton" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md">Print View</button>
-                            </div>
-                        </div>
-                    </div>
-                     <div class="mt-8 text-xs text-gray-500 print-footer hidden">${DEVELOPER_INFO}</div> </div>
-
-                <div id="view-dailyReports" data-view="dailyReports" class="hidden">
-                    <h3 class="text-xl font-semibold mb-4">Daily Reports</h3>
-                    <div class="bg-white p-6 rounded-lg shadow mb-6 print-hidden">
-                        <div class="flex flex-wrap items-end gap-4">
-                            <div>
-                                <label for="reportDateInput" class="block text-sm font-medium text-gray-700">Select Date</label>
-                                <input type="date" id="reportDateInput" class="mt-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                            </div>
-                            <button id="viewDateReportButton" class="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold py-2 px-4 rounded-md">View Daily Report</button>
-                        </div>
-                    </div>
-                    <div id="reportActionsTop" class="my-4 flex justify-end space-x-2 print-hidden">
-                         <button id="reportPrintButton" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md">Print Report</button>
-                         <button id="deleteReportButton" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md hidden">Delete Report</button>
-                    </div>
-                    <div id="reportContentDiv" class="bg-white p-2 md:p-6 rounded-lg shadow"> <p class="text-gray-500">Select date to view report.</p>
+                    <div>
+                        <label for="rate" class="block text-sm font-medium text-gray-700">Rate (PKR)</label>
+                        <input type="number" id="rate" step="0.01" class="mt-1 p-2 border rounded-md w-full" min="0">
                     </div>
                 </div>
-                <div id="view-monthlyReports" data-view="monthlyReports" class="hidden">
-                     <h3 class="text-xl font-semibold mb-4">Monthly Reports</h3>
-                     <div class="bg-white p-6 rounded-lg shadow mb-6 print-hidden">
-                        <div class="flex flex-wrap items-end gap-4">
-                            <div>
-                                <label for="reportMonthInput" class="block text-sm font-medium text-gray-700">Select Month</label>
-                                <input type="month" id="reportMonthInput" class="mt-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                            </div>
-                            <button id="viewMonthReportButton" class="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded-md">View Monthly Report</button>
-                        </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Commission per Stock</label>
+                        <p id="commissionPerStock" class="mt-1 p-2 bg-gray-100 rounded-md">PKR 0.00</p>
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Total Stock Commission</label>
+                        <p id="totalStockCommission" class="mt-1 p-2 bg-gray-100 rounded-md">PKR 0.00</p>
                     </div>
-
-
-                <div id="view-paymentRequests" data-view="paymentRequests" class="hidden">
-                    <h3 class="text-xl font-semibold mb-4">Payment Requests</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="md:col-span-1 bg-white p-6 rounded-lg shadow">
-                            <h4 class="text-lg font-medium mb-3">New Payment Request</h4>
-                            <div class="mb-3">
-                                <label for="prDateInput" class="block text-sm font-medium text-gray-700">Request Date</label>
-                                <input type="date" id="prDateInput" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
-                            </div>
-                            <div class="mb-4">
-                                <label for="prAmountInput" class="block text-sm font-medium text-gray-700">Requested Amount (PKR)</label>
-                                <input type="number" step="0.01" id="prAmountInput" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
-                            </div>
-                            <button id="prAddButton" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md">Add Request</button>
-                        </div>
-                        <div class="md:col-span-2 bg-white p-6 rounded-lg shadow">
-                            <h4 class="text-lg font-medium mb-3">Existing Requests</h4>
-                            <div id="prListDiv" class="max-h-[60vh] overflow-y-auto">
-                                <p class="text-gray-500">Loading payment requests...</p>
-                            </div>
-                        </div>
+                    <div class="flex items-end">
+                        <button id="addTransactionBtn" class="btn btn-primary w-full"><i class="fas fa-plus-circle mr-2"></i>Add Transaction to List</button>
                     </div>
                 </div>
 
-                <div id="view-monthClosure" data-view="monthClosure" class="hidden">
-                    <h3 class="text-xl font-semibold mb-4">Month Closure</h3>
-                     <div class="bg-white p-6 rounded-lg shadow mb-6">
-                        <div class="flex flex-wrap items-end gap-4">
-                            <div>
-                                <label for="mcMonthInput" class="block text-sm font-medium text-gray-700">Select Month to Close</label>
-                                <input type="month" id="mcMonthInput" class="mt-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm">
-                            </div>
-                            <button id="mcCloseMonthButton" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md">Generate & Close Month Summary</button>
+                <h3 class="text-xl font-semibold mb-4 mt-8">Transactions for <span id="currentDateDisplay"></span></h3>
+                <div class="overflow-x-auto mb-6">
+                    <table id="dailyTransactionsTable" class="min-w-full bg-white">
+                        <thead>
+                            <tr>
+                                <th class="py-2 px-4 border-b">Stock Name</th>
+                                <th class="py-2 px-4 border-b">Quantity</th>
+                                <th class="py-2 px-4 border-b">Rate</th>
+                                <th class="py-2 px-4 border-b">Comm. per Stock</th>
+                                <th class="py-2 px-4 border-b">Total Comm.</th>
+                                <th class="py-2 px-4 border-b">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rows will be added here by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="dailySummary" class="p-4 bg-gray-50 rounded-lg shadow">
+                    <h4 class="text-lg font-semibold mb-2">Summary for <span id="summaryDateDisplay"></span></h4>
+                    <p>Gross Commission: <span id="dailyGrossCommission" class="font-bold">PKR 0.00</span></p>
+                    <p>Head Office Deduction (40%): <span id="dailyHODeduction" class="font-bold">PKR 0.00</span></p>
+                    <p>Tax Deduction (12% of remaining): <span id="dailyTaxDeduction" class="font-bold">PKR 0.00</span></p>
+                    <p class="text-blue-600">Final House Commission: <span id="dailyFinalHouseCommission" class="font-bold text-xl">PKR 0.00</span></p>
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button id="saveDayTransactionsBtn" class="btn btn-primary"><i class="fas fa-save mr-2"></i>Save Transactions for Selected Date</button>
+                    <button id="printDayTransactionsBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Report for Selected Date</button>
+                </div>
+            </div>
+
+            <!-- Reports Page -->
+            <div id="reportsPage" class="page-container hidden">
+                <h2 class="text-2xl font-semibold mb-6 page-title">Reports</h2>
+                <div class="mb-6 p-4 border rounded-lg bg-gray-50">
+                    <h3 class="text-xl font-semibold mb-3">View Daily Report</h3>
+                    <div class="flex flex-col sm:flex-row gap-4 items-end">
+                        <div class="flex-grow">
+                            <label for="reportDate" class="block text-sm font-medium text-gray-700">Select Date:</label>
+                            <input type="date" id="reportDate" class="mt-1 p-2 border rounded-md w-full">
+                        </div>
+                        <button id="viewDailyReportBtn" class="btn btn-primary w-full sm:w-auto"><i class="fas fa-eye mr-2"></i>View Report</button>
+                        <button id="printDailyReportBtn" class="btn btn-secondary w-full sm:w-auto"><i class="fas fa-print mr-2"></i>Print Report</button>
+                        <button id="deleteDailyReportBtn" class="btn btn-danger w-full sm:w-auto"><i class="fas fa-trash-alt mr-2"></i>Delete Report</button>
+                    </div>
+                </div>
+                <div id="dailyReportDisplay" class="mt-6 hidden">
+                    <!-- Daily report content will be injected here -->
+                </div>
+
+                <div class="my-8 border-t pt-8"></div>
+
+                <div class="mb-6 p-4 border rounded-lg bg-gray-50">
+                    <h3 class="text-xl font-semibold mb-3">View Monthly Report</h3>
+                    <div class="flex flex-col sm:flex-row gap-4 items-end">
+                         <div class="flex-grow">
+                            <label for="reportMonth" class="block text-sm font-medium text-gray-700">Select Month:</label>
+                            <input type="month" id="reportMonth" class="mt-1 p-2 border rounded-md w-full">
+                        </div>
+                        <button id="viewMonthlyReportBtn" class="btn btn-primary w-full sm:w-auto"><i class="fas fa-calendar-alt mr-2"></i>View Report</button>
+                        <button id="printMonthlyReportBtn" class="btn btn-secondary w-full sm:w-auto"><i class="fas fa-print mr-2"></i>Print Report</button>
+                         <button id="deleteMonthlyReportBtn" class="btn btn-danger w-full sm:w-auto"><i class="fas fa-trash-alt mr-2"></i>Delete Report</button>
+                    </div>
+                </div>
+                <div id="monthlyReportDisplay" class="mt-6 hidden">
+                    <!-- Monthly report content will be injected here -->
+                </div>
+            </div>
+
+            <!-- Balance Tracking Page -->
+            <div id="balanceTrackingPage" class="page-container hidden">
+                <h2 class="text-2xl font-semibold mb-6 page-title">Balance Tracking & Settings</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="p-6 bg-blue-50 rounded-lg shadow">
+                        <h3 class="text-xl font-semibold text-blue-700 mb-2">Current Overall Balance</h3>
+                        <p id="currentOverallBalance" class="text-3xl font-bold text-blue-800">PKR 0.00</p>
+                        <p class="text-sm text-gray-600">This balance reflects the cumulative final house commission after all deductions from saved daily transactions.</p>
+                    </div>
+                    <div class="p-6 bg-green-50 rounded-lg shadow">
+                        <h3 class="text-xl font-semibold text-green-700 mb-2">Manual Balance Adjustment</h3>
+                         <label for="manualCommissionAmount" class="block text-sm font-medium text-gray-700">Amount to Add/Subtract:</label>
+                        <input type="number" id="manualCommissionAmount" step="0.01" class="mt-1 mb-2 p-2 border rounded-md w-full" placeholder="Enter amount (e.g., 1000 or -500)">
+                        <label for="manualCommissionReason" class="block text-sm font-medium text-gray-700">Reason:</label>
+                        <input type="text" id="manualCommissionReason" class="mt-1 mb-3 p-2 border rounded-md w-full" placeholder="e.g., Previous month carry-over">
+                        <button id="addManualCommissionBtn" class="btn btn-primary w-full"><i class="fas fa-plus-circle mr-2"></i>Adjust Balance</button>
+                    </div>
+                </div>
+                <div class="mt-8 p-6 bg-yellow-50 rounded-lg shadow">
+                    <h3 class="text-xl font-semibold text-yellow-800 mb-3">Month End Operations</h3>
+                    <p class="text-sm text-gray-600 mb-3">At the end of a month, you can finalize the month's earnings. This does not automatically reset the overall balance but logs the month's performance.</p>
+                    <button id="newMonthBtn" class="btn btn-primary"><i class="fas fa-calendar-check mr-2"></i>Finalize Current Month & Prepare for New Month</button>
+                    <p id="newMonthStatus" class="mt-2 text-sm text-gray-700"></p>
+                </div>
+                 <div class="mt-8">
+                    <h3 class="text-xl font-semibold mb-4">Balance Adjustment History</h3>
+                    <div class="overflow-x-auto">
+                        <table id="balanceAdjustmentHistoryTable" class="min-w-full bg-white">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Reason</th>
+                                    <th>Amount</th>
+                                    <th>Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- History will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="mt-12 p-6 bg-red-50 border border-red-300 rounded-lg shadow">
+                    <h3 class="text-xl font-semibold text-red-700 mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>Danger Zone</h3>
+                    <p class="text-sm text-gray-700 mb-4">Warning: Resetting the application will permanently erase ALL data, including transactions, reports, balances, and settings. This action cannot be undone.</p>
+                    <button id="resetApplicationDataBtn" class="btn btn-danger"><i class="fas fa-bomb mr-2"></i>Reset All Application Data</button>
+                </div>
+            </div>
+
+            <!-- Payment Requests Page -->
+            <div id="paymentRequestsPage" class="page-container hidden">
+                <h2 class="text-2xl font-semibold mb-6 page-title">Payment Requests</h2>
+                <form id="paymentRequestForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
+                    <h3 class="text-xl font-semibold mb-4">Create New Payment Request</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="paymentRequestDate" class="block text-sm font-medium">Request Date</label>
+                            <input type="date" id="paymentRequestDate" class="mt-1 w-full" required>
+                        </div>
+                        <div>
+                            <label for="paymentRequestAmount" class="block text-sm font-medium">Amount (PKR)</label>
+                            <input type="number" id="paymentRequestAmount" class="mt-1 w-full" min="0.01" step="0.01" required>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="paymentRequestDescription" class="block text-sm font-medium">Description</label>
+                            <textarea id="paymentRequestDescription" rows="3" class="mt-1 w-full" required></textarea>
                         </div>
                     </div>
-                    <div id="mcReportDiv" class="bg-white p-6 rounded-lg shadow"> <p class="text-gray-500">Select month to generate summary.</p>
+                    <button type="submit" class="btn btn-primary mt-4"><i class="fas fa-paper-plane mr-2"></i>Submit Request</button>
+                </form>
+
+                <div id="paymentRequestsSummary" class="mb-6 p-4 bg-indigo-50 rounded-lg shadow">
+                    <h3 class="text-xl font-semibold text-indigo-700 mb-3">Current Month Summary (<span id="paymentSummaryMonth"></span>)</h3>
+                    <p>Total Requested: <span id="totalRequestedAmount" class="font-bold">PKR 0.00</span></p>
+                    <p>Total Approved: <span id="totalApprovedAmount" class="font-bold">PKR 0.00</span></p>
+                    <p>Total Paid: <span id="totalPaidAmount" class="font-bold">PKR 0.00</span></p>
+                    <p>Unpaid Approved Amount: <span id="totalUnpaidApprovedAmount" class="font-bold">PKR 0.00</span></p>
+                    <button id="carryOverPaymentBtn" class="btn btn-secondary mt-3 text-sm"><i class="fas fa-random mr-2"></i>Carry Over Unpaid Approved to Next Month Balance</button>
+                </div>
+
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">Payment Request History</h3>
+                    <button id="printPaymentRequestsBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Requests</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table id="paymentRequestsTable" class="min-w-full bg-white">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Request Date</th>
+                                <th>Amount</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Payment requests will be listed here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Courier Tracking Page -->
+            <div id="courierTrackingPage" class="page-container hidden">
+                <h2 class="text-2xl font-semibold mb-6 page-title">Courier Tracking</h2>
+                <form id="courierTrackingForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
+                    <h3 class="text-xl font-semibold mb-4">Add New Courier Entry</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="courierType" class="block text-sm font-medium">Type</label>
+                            <select id="courierType" class="mt-1 w-full">
+                                <option value="outgoing">Outgoing</option>
+                                <option value="incoming">Incoming</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="courierDateSent" class="block text-sm font-medium">Date Sent/Received</label>
+                            <input type="date" id="courierDateSent" class="mt-1 w-full" required>
+                        </div>
+                        <div>
+                            <label for="courierTrackingId" class="block text-sm font-medium">Tracking ID</label>
+                            <input type="text" id="courierTrackingId" class="mt-1 w-full"> <!-- Not always required e.g. local hand delivery -->
+                        </div>
+                         <div>
+                            <label for="courierSenderName" class="block text-sm font-medium">Sender Name</label>
+                            <input type="text" id="courierSenderName" class="mt-1 w-full" required>
+                        </div>
+                        <div>
+                            <label for="courierReceiverName" class="block text-sm font-medium">Receiver Name</label>
+                            <input type="text" id="courierReceiverName" class="mt-1 w-full" required>
+                        </div>
+                        <div>
+                            <label for="courierDestination" class="block text-sm font-medium">Destination/Origin</label>
+                            <input type="text" id="courierDestination" class="mt-1 w-full" required>
+                        </div>
+                         <div class="md:col-span-2">
+                            <label for="courierStatus" class="block text-sm font-medium">Status</label>
+                            <input type="text" id="courierStatus" class="mt-1 w-full" placeholder="e.g., Sent, In Transit, Delivered, Received" required>
+                        </div>
+                         <div class="md:col-span-2">
+                            <label for="courierDescription" class="block text-sm font-medium">Description/Contents</label>
+                            <textarea id="courierDescription" rows="2" class="mt-1 w-full"></textarea>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-4"><i class="fas fa-plus-circle mr-2"></i>Add Courier Entry</button>
+                </form>
+
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">Courier Records</h3>
+                    <button id="printCourierReportBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Courier Report</button>
+                </div>
+                 <div class="overflow-x-auto">
+                    <table id="courierTrackingTable" class="min-w-full bg-white">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Type</th>
+                                <th>Date</th>
+                                <th>Track ID</th>
+                                <th>Sender</th>
+                                <th>Receiver</th>
+                                <th>Dest./Origin</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Courier records will be listed here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Branch Budget Page -->
+            <div id="branchBudgetPage" class="page-container hidden">
+                <h2 class="text-2xl font-semibold mb-6 page-title">Branch Budget Management</h2>
+                 <form id="branchBudgetForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
+                    <h3 class="text-xl font-semibold mb-4">Add New Budget Entry</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="budgetEntryDate" class="block text-sm font-medium">Date</label>
+                            <input type="date" id="budgetEntryDate" class="mt-1 w-full" required>
+                        </div>
+                        <div>
+                            <label for="budgetItem" class="block text-sm font-medium">Item/Expense Description</label>
+                            <input type="text" id="budgetItem" class="mt-1 w-full" required>
+                        </div>
+                        <div>
+                            <label for="budgetAmount" class="block text-sm font-medium">Amount (PKR)</label>
+                            <input type="number" id="budgetAmount" class="mt-1 w-full" min="0.01" step="0.01" required>
+                        </div>
+                        <div>
+                            <label for="budgetBillImage" class="block text-sm font-medium">Upload Bill (Image)</label>
+                            <input type="file" id="budgetBillImage" accept="image/*" class="mt-1 w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        </div>
+                        <div class="md:col-span-2">
+                            <img id="billImagePreview" src="#" alt="Bill Preview" class="hidden mt-2 max-h-48 rounded border p-1">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-4"><i class="fas fa-save mr-2"></i>Save Budget Entry</button>
+                </form>
+
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">Budget Entries</h3>
+                    <button id="printBudgetReportBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Budget Report</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table id="branchBudgetTable" class="min-w-full bg-white">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Date</th>
+                                <th>Item</th>
+                                <th>Amount</th>
+                                <th>Bill</th>
+                                <th class="action-column">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Budget entries will be listed here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Authentication Modal -->
+            <div id="authModal" class="modal hidden">
+                <div class="modal-content">
+                    <h3 class="modal-title">Authentication Required</h3>
+                    <p class="text-sm text-gray-600 mb-4">Please enter credentials to proceed.</p>
+                    <div>
+                        <label for="username" class="block text-sm font-medium">Username</label>
+                        <input type="text" id="username" class="mt-1 w-full">
+                    </div>
+                    <div class="mt-4">
+                        <label for="password" class="block text-sm font-medium">Password</label>
+                        <input type="password" id="password" class="mt-1 w-full">
+                    </div>
+                    <p id="authError" class="text-red-500 text-sm mt-2 hidden"></p>
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button id="cancelAuthBtn" class="btn btn-secondary">Cancel</button>
+                        <button id="submitAuthBtn" class="btn btn-primary">Login</button>
                     </div>
                 </div>
             </div>
             
-            <footer class="bg-white border-t p-4 text-center text-sm text-gray-600 print-hidden">
-                <p id="footerDevInfo"></p>
-            </footer>
-        </main>
-    </section>
-
-    <div id="appModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center print-hidden hidden z-50">
-        <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <div class="mt-3 text-center">
-                <h3 id="modalTitle" class="text-lg leading-6 font-medium text-gray-900">Modal Title</h3>
-                <div id="modalBody" class="mt-2 px-7 py-3 text-sm text-gray-500">
+            <!-- Generic Message Modal (can be used for info or simple confirmation) -->
+            <div id="messageModal" class="modal hidden">
+                <div class="modal-content">
+                    <h3 id="messageModalTitle" class="modal-title">Notification</h3>
+                    <p id="messageModalText" class="text-sm text-gray-700 my-4"></p>
+                    <div id="messageModalButtons" class="mt-6 flex justify-end space-x-3">
+                        <button id="messageModalOkBtn" class="btn btn-primary">OK</button>
+                        <!-- Optional Cancel button for confirmation -->
+                        <button id="messageModalCancelBtn" class="btn btn-secondary hidden">Cancel</button>
                     </div>
-                <div id="modalActions" class="items-center px-4 py-3 space-x-2">
-                    </div>
-                 <button id="modalCloseButton" class="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
+                </div>
             </div>
-        </div>
+
+            <!-- Bill Preview Modal -->
+            <div id="billPreviewModal" class="modal hidden">
+                <div class="modal-content modal-lg"> <!-- Added modal-lg for potentially larger images -->
+                    <h3 id="billPreviewModalTitle" class="modal-title">Bill Preview</h3>
+                    <div class="my-4 flex justify-center bg-gray-100 p-2 rounded">
+                        <img id="billPreviewImageElement" src="#" alt="Bill Preview" class="max-w-full max-h-[70vh] object-contain">
+                    </div>
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button id="printBillFromModalBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Bill</button>
+                        <button id="closeBillPreviewModalBtn" class="btn btn-primary">Close</button>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Print Footer -->
+            <div class="print-footer">
+                <p>Developed by Afrasiab Asghar. Visit www.nextgensites.org or Contact +923060406003</p>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white text-center p-4 no-print">
+            <p>&copy; <span id="currentYear"></span> Darson Securities Limited. All rights reserved.</p>
+            <p class="text-sm text-gray-400">Developed by Afrasiab Asghar. Visit <a href="http://www.nextgensites.org" target="_blank" class="underline hover:text-gray-200">www.nextgensites.org</a> or Contact +923060406003</p>
+        </footer>
     </div>
 
-    <div id="toastNotification" class="fixed bottom-5 right-5 px-4 py-3 rounded-md text-white shadow-lg transition-opacity duration-300 ease-in-out hidden z-50 print-hidden">
-        <p id="toastMessage">Toast message!</p>
-    </div>
+    <script>
+        // --- UTILITY FUNCTIONS ---
+        const Utils = {
+            formatDateForStorage: (date) => {
+                const d = new Date(date);
+                const year = d.getFullYear();
+                const month = ('0' + (d.getMonth() + 1)).slice(-2);
+                const day = ('0' + d.getDate()).slice(-2);
+                return `${year}-${month}-${day}`;
+            },
+            formatDateForDisplay: (dateString) => {
+                if (!dateString) return '';
+                const [year, month, day] = dateString.split('-');
+                return `${day}-${month}-${year}`;
+            },
+            formatMonthForDisplay: (monthString) => {
+                if (!monthString) return '';
+                const [year, month] = monthString.split('-');
+                const monthNames = ["January", "February", "March", "April", "May", "June",
+                                  "July", "August", "September", "October", "November", "December"];
+                return `${monthNames[parseInt(month) - 1]} ${year}`;
+            },
+            formatCurrency: (amount) => `PKR ${parseFloat(amount).toFixed(2)}`,
+            generateId: () => Date.now().toString(36) + Math.random().toString(36).substr(2, 9),
+            showMessage: (title, message) => {
+                document.getElementById('messageModalTitle').textContent = title;
+                document.getElementById('messageModalText').textContent = message;
+                document.getElementById('messageModalOkBtn').onclick = () => Utils.hideMessageModal();
+                document.getElementById('messageModalCancelBtn').classList.add('hidden');
+                document.getElementById('messageModal').classList.remove('hidden');
+            },
+            showConfirmationModal: (title, message, onOkCallback, onCancelCallback) => {
+                document.getElementById('messageModalTitle').textContent = title;
+                document.getElementById('messageModalText').textContent = message;
+                const okBtn = document.getElementById('messageModalOkBtn');
+                const cancelBtn = document.getElementById('messageModalCancelBtn');
+                okBtn.onclick = () => { Utils.hideMessageModal(); if (onOkCallback) onOkCallback(); };
+                cancelBtn.onclick = () => { Utils.hideMessageModal(); if (onCancelCallback) onCancelCallback(); };
+                cancelBtn.classList.remove('hidden');
+                document.getElementById('messageModal').classList.remove('hidden');
+            },
+            hideMessageModal: () => document.getElementById('messageModal').classList.add('hidden'),
+            getTodayDateString: () => Utils.formatDateForStorage(new Date()),
+            getCurrentMonthYearString: () => {
+                const now = new Date();
+                return `${now.getFullYear()}-${('0' + (now.getMonth() + 1)).slice(-2)}`;
+            }
+        };
+        
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
 
+        // --- APPLICATION STATE AND DATA MANAGEMENT ---
+        const AppState = {
+            currentPage: 'dashboard',
+            currentTransactions: [], // Holds transactions for the date currently active on the dashboard
+            targetDateForDashboard: Utils.getTodayDateString(), // Date dashboard is currently operating on
+            dailyDataCache: {}, 
+            monthlyDataCache: {}, 
+            authCallback: null, 
+            itemToDeleteType: null, 
+            itemToDeleteId: null, 
+        };
+
+        const StorageService = {
+            prefix: 'darsonApp_',
+            getItem: (key) => { const item = localStorage.getItem(StorageService.prefix + key); return item ? JSON.parse(item) : null; },
+            setItem: (key, value) => localStorage.setItem(StorageService.prefix + key, JSON.stringify(value)),
+            removeItem: (key) => localStorage.removeItem(StorageService.prefix + key),
+            getAllKeysWithSubPrefix: (subPrefix) => {
+                const keys = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith(StorageService.prefix + subPrefix)) keys.push(key.replace(StorageService.prefix, ''));
+                }
+                return keys;
+            },
+            clearAllAppData: () => {
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    if (localStorage.key(i).startsWith(StorageService.prefix)) keysToRemove.push(localStorage.key(i));
+                }
+                keysToRemove.forEach(key => localStorage.removeItem(key));
+            }
+        };
+        
+        // --- COMMISSION CALCULATION LOGIC ---
+        const CommissionService = {
+            calculateCommission: (rate, quantity) => {
+                let commissionPerStockValue;
+                rate = parseFloat(rate); quantity = parseInt(quantity);
+                if (isNaN(rate) || isNaN(quantity) || rate <= 0 || quantity <= 0) return { commissionPerStock: 0, totalStockCommission: 0 };
+                if (rate >= 0.01 && rate <= 3.00) commissionPerStockValue = 0.03;
+                else if (rate >= 3.01 && rate <= 20.00) commissionPerStockValue = 0.07;
+                else if (rate >= 20.01 && rate <= 40.00) commissionPerStockValue = 0.09;
+                else if (rate >= 40.01 && rate <= 50.00) commissionPerStockValue = 0.12;
+                else if (rate >= 50.01 && rate <= 90.00) commissionPerStockValue = 0.14;
+                else if (rate >= 90.01 && rate <= 100.00) commissionPerStockValue = 0.17;
+                else if (rate > 100.00) commissionPerStockValue = rate * 0.0017;
+                else commissionPerStockValue = 0;
+                return { commissionPerStock: commissionPerStockValue, totalStockCommission: commissionPerStockValue * quantity };
+            },
+            calculateDeductions: (grossCommission) => {
+                const hoDeduction = grossCommission * 0.40;
+                const remainingAfterHO = grossCommission - hoDeduction;
+                const taxDeduction = remainingAfterHO * 0.12;
+                const finalHouseCommission = remainingAfterHO - taxDeduction;
+                return { grossCommission, hoDeduction, taxDeduction, finalHouseCommission };
+            }
+        };
+
+        // --- UI RENDERING AND EVENT HANDLERS ---
+        const UIController = {
+            init: () => {
+                // Navigation
+                document.querySelectorAll('nav a[data-page]').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault(); UIController.navigateTo(link.dataset.page);
+                        document.querySelectorAll('nav a[data-page]').forEach(l => l.classList.remove('active'));
+                        link.classList.add('active'); document.getElementById('navLinks').classList.add('hidden');
+                    });
+                });
+                document.getElementById('mobileMenuButton').addEventListener('click', () => document.getElementById('navLinks').classList.toggle('hidden'));
+
+                // Set dates
+                document.getElementById('dashboardDateInput').value = AppState.targetDateForDashboard; // Set initial value
+                document.getElementById('reportDate').value = Utils.getTodayDateString();
+                document.getElementById('reportMonth').value = Utils.getCurrentMonthYearString();
+
+                // Dashboard Listeners
+                document.getElementById('dashboardDateInput').addEventListener('change', () => {
+                    // Update AppState.targetDateForDashboard when input changes, then load.
+                    AppState.targetDateForDashboard = document.getElementById('dashboardDateInput').value || Utils.getTodayDateString();
+                    UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard);
+                });
+                document.getElementById('loadDashboardDateBtn').addEventListener('click', () => {
+                    // Explicitly load based on current input value
+                    const selectedDate = document.getElementById('dashboardDateInput').value || Utils.getTodayDateString();
+                    UIController.loadTransactionsForDashboard(selectedDate);
+                });
+                ['quantity', 'rate'].forEach(id => document.getElementById(id).addEventListener('input', UIController.updateDashboardCommissionDisplay));
+                document.getElementById('addTransactionBtn').addEventListener('click', UIController.addTransactionToCurrentList);
+                document.getElementById('saveDayTransactionsBtn').addEventListener('click', UIController.saveCurrentDayTransactions);
+                document.getElementById('printDayTransactionsBtn').addEventListener('click', () => UIController.printReport('daily_current'));
+
+                // Reports Page Listeners (same as before)
+                document.getElementById('viewDailyReportBtn').addEventListener('click', UIController.displayDailyReport);
+                document.getElementById('printDailyReportBtn').addEventListener('click', () => UIController.printReport('daily_historical'));
+                document.getElementById('deleteDailyReportBtn').addEventListener('click', () => {
+                     const d = document.getElementById('reportDate').value; if (!d) { Utils.showMessage('Input Required', 'Select date to delete.'); return; }
+                    UIController.requestAuthThenDelete('dailyReport', d);
+                });
+                document.getElementById('viewMonthlyReportBtn').addEventListener('click', UIController.displayMonthlyReport);
+                document.getElementById('printMonthlyReportBtn').addEventListener('click', () => UIController.printReport('monthly'));
+                document.getElementById('deleteMonthlyReportBtn').addEventListener('click', () => {
+                    const m = document.getElementById('reportMonth').value; if (!m) { Utils.showMessage('Input Required', 'Select month to delete.'); return; }
+                    UIController.requestAuthThenDelete('monthlyReport', m);
+                });
+
+                // Balance Tracking & Settings Listeners
+                document.getElementById('addManualCommissionBtn').addEventListener('click', BalanceTrackingController.addManualBalanceAdjustment);
+                document.getElementById('newMonthBtn').addEventListener('click', BalanceTrackingController.finalizeCurrentMonth);
+                document.getElementById('resetApplicationDataBtn').addEventListener('click', DataResetService.initiateFullResetProcess);
+
+                // Payment Requests Listeners
+                document.getElementById('paymentRequestForm').addEventListener('submit', PaymentRequestController.handleAddRequest);
+                document.getElementById('printPaymentRequestsBtn').addEventListener('click', () => UIController.printReport('paymentRequests'));
+                document.getElementById('carryOverPaymentBtn').addEventListener('click', PaymentRequestController.carryOverUnpaidApproved);
+                
+                // Courier Tracking Listeners
+                document.getElementById('courierTrackingForm').addEventListener('submit', CourierTrackingController.handleAddEntry);
+                document.getElementById('printCourierReportBtn').addEventListener('click', () => UIController.printReport('courierTracking'));
+
+                // Branch Budget Listeners
+                document.getElementById('branchBudgetForm').addEventListener('submit', BranchBudgetController.handleAddEntry);
+                document.getElementById('budgetBillImage').addEventListener('change', BranchBudgetController.previewBillImage);
+                document.getElementById('printBudgetReportBtn').addEventListener('click', () => UIController.printReport('branchBudget'));
+                document.getElementById('closeBillPreviewModalBtn').addEventListener('click', BranchBudgetController.hideBillPreviewModal);
+                document.getElementById('printBillFromModalBtn').addEventListener('click', BranchBudgetController.printSpecificBill);
+
+                // Modal Listeners
+                document.getElementById('cancelAuthBtn').addEventListener('click', UIController.hideAuthModal);
+                document.getElementById('submitAuthBtn').addEventListener('click', AuthController.handleLogin);
+                
+                UIController.navigateTo('dashboard'); // This will also call loadTransactionsForDashboard for today
+            },
+
+            navigateTo: (pageId) => {
+                document.querySelectorAll('.page-container').forEach(page => page.classList.add('hidden'));
+                const targetPage = document.getElementById(pageId + 'Page');
+                if (targetPage) {
+                    targetPage.classList.remove('hidden'); AppState.currentPage = pageId;
+                    if (pageId === 'dashboard') UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); // Load for current target or default to today
+                    if (pageId === 'balanceTracking') { BalanceTrackingController.updateOverallBalanceDisplay(); BalanceTrackingController.loadAdjustmentHistory(); }
+                    if (pageId === 'paymentRequests') PaymentRequestController.loadRequests();
+                    if (pageId === 'courierTracking') CourierTrackingController.loadEntries();
+                    if (pageId === 'branchBudget') BranchBudgetController.loadEntries();
+                    if (pageId === 'reports') { document.getElementById('dailyReportDisplay').classList.add('hidden').innerHTML = ''; document.getElementById('monthlyReportDisplay').classList.add('hidden').innerHTML = ''; }
+                } else console.error(`Page ${pageId}Page not found.`);
+            },
+
+            loadTransactionsForDashboard: (dateString) => {
+                AppState.targetDateForDashboard = dateString; // Update the active date
+                document.getElementById('dashboardDateInput').value = dateString; // Sync date picker
+                
+                const displayDate = Utils.formatDateForDisplay(dateString);
+                const isToday = dateString === Utils.getTodayDateString();
+                const dateLabel = `${displayDate} ${isToday ? '(Today)' : '(Selected Date)'}`;
+                document.getElementById('currentDateDisplay').textContent = dateLabel;
+                document.getElementById('summaryDateDisplay').textContent = displayDate;
+
+
+                const data = StorageService.getItem(`transactions_${dateString}`);
+                if (data && data.transactions) {
+                    // Ensure transactions have a temporary unique ID for UI manipulation (like removal before save)
+                    AppState.currentTransactions = data.transactions.map(tx => ({...tx, tempId: tx.tempId || Utils.generateId()}));
+                    Utils.showMessage('Data Loaded', `Loaded transactions for ${displayDate}. You can add more or modify.`);
+                } else {
+                    AppState.currentTransactions = []; // Start fresh for this date
+                    Utils.showMessage('No Data', `No transactions found for ${displayDate}. You can add new ones.`);
+                }
+                UIController.renderCurrentTransactionsTable(); // Renders AppState.currentTransactions
+                UIController.updateDailySummaryDisplay();    // Calculates summary from AppState.currentTransactions
+                UIController.resetDashboardCalculatorFields(); // Clears input fields for new entry
+            },
+
+
+            updateDashboardCommissionDisplay: () => {
+                const q = parseFloat(document.getElementById('quantity').value) || 0, r = parseFloat(document.getElementById('rate').value) || 0;
+                const { commissionPerStock, totalStockCommission } = CommissionService.calculateCommission(r, q);
+                document.getElementById('commissionPerStock').textContent = Utils.formatCurrency(commissionPerStock);
+                document.getElementById('totalStockCommission').textContent = Utils.formatCurrency(totalStockCommission);
+            },
+
+            addTransactionToCurrentList: () => {
+                const sn = document.getElementById('stockName').value.trim(), q = parseInt(document.getElementById('quantity').value), r = parseFloat(document.getElementById('rate').value);
+                if (!sn || isNaN(q) || q <= 0 || isNaN(r) || r <= 0) { Utils.showMessage('Validation Error', 'Enter valid Stock Name, Quantity, and Rate.'); return; }
+                const { commissionPerStock, totalStockCommission } = CommissionService.calculateCommission(r, q);
+                // Add to AppState.currentTransactions, which holds all transactions for the AppState.targetDateForDashboard
+                AppState.currentTransactions.push({ 
+                    tempId: Utils.generateId(), // Temporary ID for UI removal before saving
+                    stockName: sn, quantity: q, rate: r, 
+                    commissionPerStock, totalStockCommission, 
+                    transactionTime: new Date().toLocaleTimeString() 
+                });
+                UIController.renderCurrentTransactionsTable(); 
+                UIController.updateDailySummaryDisplay(); 
+                UIController.resetDashboardCalculatorFields();
+            },
+
+            resetDashboardCalculatorFields: () => {
+                document.getElementById('stockName').value = ''; document.getElementById('quantity').value = ''; document.getElementById('rate').value = '';
+                document.getElementById('stockName').focus(); UIController.updateDashboardCommissionDisplay();
+            },
+            
+            renderCurrentTransactionsTable: () => {
+                const tbody = document.getElementById('dailyTransactionsTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
+                if (AppState.currentTransactions.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-4">No transactions for this date.</td></tr>'; return; }
+                AppState.currentTransactions.forEach(tx => {
+                    const row = tbody.insertRow(); 
+                    row.insertCell().textContent = tx.stockName; 
+                    row.insertCell().textContent = tx.quantity; 
+                    row.insertCell().textContent = Utils.formatCurrency(tx.rate);
+                    row.insertCell().textContent = Utils.formatCurrency(tx.commissionPerStock); 
+                    row.insertCell().textContent = Utils.formatCurrency(tx.totalStockCommission);
+                    const ac = row.insertCell(); const rmBtn = document.createElement('button'); 
+                    rmBtn.innerHTML = '<i class="fas fa-trash-alt"></i>'; rmBtn.classList.add('btn', 'btn-danger', 'btn-icon', 'text-xs');
+                    rmBtn.onclick = () => UIController.removeTransactionFromCurrentList(tx.tempId); // Use tempId
+                    ac.appendChild(rmBtn);
+                });
+            },
+
+            removeTransactionFromCurrentList: (tempId) => { // Use tempId
+                AppState.currentTransactions = AppState.currentTransactions.filter(tx => tx.tempId !== tempId);
+                UIController.renderCurrentTransactionsTable(); 
+                UIController.updateDailySummaryDisplay();
+            },
+
+            updateDailySummaryDisplay: () => { // Calculates from AppState.currentTransactions
+                const gc = AppState.currentTransactions.reduce((s, tx) => s + tx.totalStockCommission, 0);
+                const d = CommissionService.calculateDeductions(gc);
+                document.getElementById('dailyGrossCommission').textContent = Utils.formatCurrency(d.grossCommission);
+                document.getElementById('dailyHODeduction').textContent = Utils.formatCurrency(d.hoDeduction);
+                document.getElementById('dailyTaxDeduction').textContent = Utils.formatCurrency(d.taxDeduction);
+                document.getElementById('dailyFinalHouseCommission').textContent = Utils.formatCurrency(d.finalHouseCommission);
+            },
+
+            saveCurrentDayTransactions: () => {
+                const targetDate = AppState.targetDateForDashboard;
+
+                // AppState.currentTransactions holds ALL transactions for the targetDate (loaded + newly added)
+                // If it's empty, but there was data before, this means the user deleted all and wants to save an empty day.
+                // If it's empty and there was no data before, then don't save.
+                const existingDataForDate = StorageService.getItem(`transactions_${targetDate}`);
+                if (AppState.currentTransactions.length === 0 && !existingDataForDate) {
+                    Utils.showMessage('No Transactions', `No transactions to save for ${Utils.formatDateForDisplay(targetDate)}.`);
+                    return;
+                }
+
+                const grossCommission = AppState.currentTransactions.reduce((sum, tx) => sum + tx.totalStockCommission, 0);
+                const deductions = CommissionService.calculateDeductions(grossCommission);
+
+                // Prepare transactions for saving by removing the temporary UI 'tempId'
+                const transactionsToSave = AppState.currentTransactions.map(tx => {
+                    const { tempId, ...rest } = tx; // Destructure to exclude tempId
+                    return { ...rest, transactionTime: tx.transactionTime || new Date().toLocaleTimeString() }; // Ensure time
+                });
+
+                const dailyReportDataToSave = {
+                    date: targetDate,
+                    transactions: transactionsToSave,
+                    ...deductions
+                };
+
+                StorageService.setItem(`transactions_${targetDate}`, dailyReportDataToSave);
+                BalanceTrackingController.updateOverallBalanceDisplay(); // Recalculates from all stored data
+
+                Utils.showMessage('Success', `Transactions for ${Utils.formatDateForDisplay(targetDate)} saved successfully.`);
+                UIController.resetDashboardCalculatorFields(); // Clear input fields for next entry
+                // The dashboard already reflects the saved state, so no need to reload AppState.currentTransactions here.
+            },
+
+            displayDailyReport: () => {
+                const rd = document.getElementById('reportDate').value; if (!rd) { Utils.showMessage('Input Required', 'Select date.'); return; }
+                const data = StorageService.getItem(`transactions_${rd}`), displayDiv = document.getElementById('dailyReportDisplay');
+                if (!data) { displayDiv.innerHTML = `<p class="text-red-500">No data for ${Utils.formatDateForDisplay(rd)}.</p>`; displayDiv.classList.remove('hidden'); return; }
+                AppState.dailyDataCache[rd] = data;
+                let html = `<h3 class="text-xl font-semibold mb-2">Daily Report for ${Utils.formatDateForDisplay(rd)}</h3><div class="overflow-x-auto"><table class="min-w-full bg-white mb-4"><thead><tr><th>Stock</th><th>Qty</th><th>Rate</th><th>Comm/S</th><th>Total Comm.</th><th>Time</th></tr></thead><tbody>`;
+                data.transactions.forEach(tx => { html += `<tr><td>${tx.stockName}</td><td>${tx.quantity}</td><td>${Utils.formatCurrency(tx.rate)}</td><td>${Utils.formatCurrency(tx.commissionPerStock)}</td><td>${Utils.formatCurrency(tx.totalStockCommission)}</td><td>${tx.transactionTime||'N/A'}</td></tr>`; });
+                html += `</tbody></table></div><div class="p-4 bg-gray-100 rounded"><p>Gross: <span class="font-bold">${Utils.formatCurrency(data.grossCommission)}</span></p><p>HO Deduct: <span class="font-bold">${Utils.formatCurrency(data.hoDeduction)}</span></p><p>Tax: <span class="font-bold">${Utils.formatCurrency(data.taxDeduction)}</span></p><p class="text-blue-600">Final: <span class="font-bold text-xl">${Utils.formatCurrency(data.finalHouseCommission)}</span></p></div>`;
+                displayDiv.innerHTML = html; displayDiv.classList.remove('hidden');
+            },
+
+            displayMonthlyReport: () => {
+                const rmy = document.getElementById('reportMonth').value; if (!rmy) { Utils.showMessage('Input Required', 'Select month.'); return; }
+                const keys = StorageService.getAllKeysWithSubPrefix('transactions_');
+                const reports = keys.filter(k => k.startsWith(`transactions_${rmy}`)).map(k => StorageService.getItem(k)).filter(d => d).sort((a,b) => new Date(a.date) - new Date(b.date));
+                const displayDiv = document.getElementById('monthlyReportDisplay');
+                if (reports.length === 0) { displayDiv.innerHTML = `<p class="text-red-500">No data for ${Utils.formatMonthForDisplay(rmy)}.</p>`; displayDiv.classList.remove('hidden'); return; }
+                let tg=0, th=0, tt=0, tf=0; reports.forEach(d => { tg+=d.grossCommission; th+=d.hoDeduction; tt+=d.taxDeduction; tf+=d.finalHouseCommission; });
+                AppState.monthlyDataCache[rmy] = { month: rmy, dailySummaries: reports, totalGross:tg, totalHO:th, totalTax:tt, totalFinal:tf };
+                let html = `<h3 class="text-xl font-semibold mb-2">Monthly Report for ${Utils.formatMonthForDisplay(rmy)}</h3><div class="overflow-x-auto"><table class="min-w-full bg-white mb-4"><thead><tr><th>Date</th><th>Gross</th><th>HO</th><th>Tax</th><th>Final</th></tr></thead><tbody>`;
+                reports.forEach(d => { html += `<tr><td>${Utils.formatDateForDisplay(d.date)}</td><td>${Utils.formatCurrency(d.grossCommission)}</td><td>${Utils.formatCurrency(d.hoDeduction)}</td><td>${Utils.formatCurrency(d.taxDeduction)}</td><td>${Utils.formatCurrency(d.finalHouseCommission)}</td></tr>`; });
+                html += `</tbody></table></div><div class="p-4 bg-gray-100 rounded mt-4"><h4 class="text-lg font-semibold mb-2">Totals:</h4><p>Gross: <span class="font-bold">${Utils.formatCurrency(tg)}</span></p><p>HO: <span class="font-bold">${Utils.formatCurrency(th)}</span></p><p>Tax: <span class="font-bold">${Utils.formatCurrency(tt)}</span></p><p class="text-blue-600">Final: <span class="font-bold text-xl">${Utils.formatCurrency(tf)}</span></p></div>`;
+                displayDiv.innerHTML = html; displayDiv.classList.remove('hidden');
+            },
+            
+            printReport: (type) => {
+                const titleEl = document.getElementById('printReportTitle'), dateEl = document.getElementById('printReportDate');
+                let content = '', rTitle = 'Report', rDateStr = Utils.formatDateForDisplay(Utils.getTodayDateString());
+
+                if (type === 'daily_current') {
+                    if (AppState.currentTransactions.length === 0) { Utils.showMessage('Error', 'No transactions on dashboard to print.'); return; }
+                    rTitle = `Daily Commission Report`;
+                    rDateStr = Utils.formatDateForDisplay(AppState.targetDateForDashboard); 
+
+                    let tempTableHtml = '<table class="min-w-full bg-white"><thead><tr><th>Stock Name</th><th>Quantity</th><th>Rate</th><th>Comm. per Stock</th><th>Total Comm.</th><th>Time</th></tr></thead><tbody>';
+                    AppState.currentTransactions.forEach(tx => {
+                        tempTableHtml += `<tr><td>${tx.stockName}</td><td>${tx.quantity}</td><td>${Utils.formatCurrency(tx.rate)}</td><td>${Utils.formatCurrency(tx.commissionPerStock)}</td><td>${Utils.formatCurrency(tx.totalStockCommission)}</td><td>${tx.transactionTime || 'N/A'}</td></tr>`;
+                    });
+                    tempTableHtml += '</tbody></table>';
+
+                    const currentGross = AppState.currentTransactions.reduce((sum, tx) => sum + tx.totalStockCommission, 0);
+                    const currentDeductions = CommissionService.calculateDeductions(currentGross);
+                    let tempSummaryHtml = `<div class="p-4 bg-gray-100 rounded-lg shadow mt-4">
+                        <h4 class="text-lg font-semibold mb-2">Summary for ${rDateStr}</h4>
+                        <p>Gross Commission: <span class="font-bold">${Utils.formatCurrency(currentDeductions.grossCommission)}</span></p>
+                        <p>Head Office Deduction (40%): <span class="font-bold">${Utils.formatCurrency(currentDeductions.hoDeduction)}</span></p>
+                        <p>Tax Deduction (12% of remaining): <span class="font-bold">${Utils.formatCurrency(currentDeductions.taxDeduction)}</span></p>
+                        <p class="text-blue-600">Final House Commission: <span class="font-bold text-xl">${Utils.formatCurrency(currentDeductions.finalHouseCommission)}</span></p>
+                    </div>`;
+                    content = `<div class="page-container">${tempTableHtml}${tempSummaryHtml}</div>`;
+                }
+                else if (type === 'daily_historical') { const d = document.getElementById('reportDate').value, data = AppState.dailyDataCache[d]; if (!data) { Utils.showMessage('Error', 'View daily report first.'); return; } rTitle = 'Daily Commission Report'; rDateStr = Utils.formatDateForDisplay(data.date); content = `<div class="page-container">${document.getElementById('dailyReportDisplay').innerHTML}</div>`; }
+                else if (type === 'monthly') { const m = document.getElementById('reportMonth').value, data = AppState.monthlyDataCache[m]; if (!data) { Utils.showMessage('Error', 'View monthly report first.'); return; } rTitle = 'Monthly Commission Report'; rDateStr = Utils.formatMonthForDisplay(data.month); content = `<div class="page-container">${document.getElementById('monthlyReportDisplay').innerHTML}</div>`; }
+                else if (type === 'paymentRequests') { rTitle = 'Payment Requests Report'; content = `<div class="page-container"><h3>${document.getElementById('paymentRequestsSummary').innerHTML.replace(/<button.*?<\/button>/gi, '')}</h3>${document.getElementById('paymentRequestsTable').outerHTML}</div>`; }
+                else if (type === 'courierTracking') { rTitle = 'Courier Tracking Report'; content = `<div class="page-container">${document.getElementById('courierTrackingTable').outerHTML}</div>`; }
+                else if (type === 'branchBudget') { rTitle = 'Branch Budget Report'; let tbl = '<table>' + document.getElementById('branchBudgetTable').innerHTML + '</table>'; tbl = tbl.replace(/<th class="action-column">Actions<\/th>/gi, '<th></th>').replace(/<td class="action-column">.*?<\/td>/gi, '<td></td>'); content = `<div class="page-container">${tbl}</div>`; }
+                else { Utils.showMessage('Error', 'Unknown report type.'); return; }
+                
+                titleEl.textContent = rTitle; dateEl.textContent = rDateStr; const origBody = document.body.innerHTML;
+                document.body.innerHTML = document.querySelector('.print-header').outerHTML + content + document.querySelector('.print-footer').outerHTML;
+                window.print(); document.body.innerHTML = origBody; UIController.init(); UIController.navigateTo(AppState.currentPage);
+                if (AppState.currentPage === 'dashboard') { UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); } // Ensure dashboard reloads correctly
+                if (AppState.currentPage === 'reports') { if (document.getElementById('reportDate').value && AppState.dailyDataCache[document.getElementById('reportDate').value]) UIController.displayDailyReport(); if (document.getElementById('reportMonth').value && AppState.monthlyDataCache[document.getElementById('reportMonth').value]) UIController.displayMonthlyReport(); }
+                if (AppState.currentPage === 'paymentRequests') PaymentRequestController.loadRequests(); if (AppState.currentPage === 'courierTracking') CourierTrackingController.loadEntries(); if (AppState.currentPage === 'branchBudget') BranchBudgetController.loadEntries();
+            },
+
+            showAuthModal: (callback, itemType, itemId) => {
+                AppState.authCallback = callback; AppState.itemToDeleteType = itemType; AppState.itemToDeleteId = itemId;
+                document.getElementById('username').value = ''; document.getElementById('password').value = '';
+                document.getElementById('authError').classList.add('hidden'); document.getElementById('authModal').classList.remove('hidden'); document.getElementById('username').focus();
+            },
+            hideAuthModal: () => {
+                document.getElementById('authModal').classList.add('hidden'); AppState.authCallback = null; AppState.itemToDeleteType = null; AppState.itemToDeleteId = null;
+            },
+            requestAuthThenDelete: (itemType, itemId) => {
+                UIController.showAuthModal(() => {
+                    if (itemType === 'dailyReport') { StorageService.removeItem(`transactions_${itemId}`); delete AppState.dailyDataCache[itemId]; document.getElementById('dailyReportDisplay').innerHTML = `<p class="text-green-500">Report for ${Utils.formatDateForDisplay(itemId)} deleted.</p>`; Utils.showMessage('Success', `Daily report for ${Utils.formatDateForDisplay(itemId)} deleted.`); }
+                    else if (itemType === 'monthlyReport') { const keys = StorageService.getAllKeysWithSubPrefix('transactions_'); let c = 0; keys.forEach(k => { if (k.startsWith(`transactions_${itemId}`)) { StorageService.removeItem(k); c++; } }); delete AppState.monthlyDataCache[itemId]; document.getElementById('monthlyReportDisplay').innerHTML = `<p class="text-green-500">Data for ${Utils.formatMonthForDisplay(itemId)} (${c} days) deleted.</p>`; Utils.showMessage('Success', `Data for ${Utils.formatMonthForDisplay(itemId)} deleted.`); }
+                    BalanceTrackingController.updateOverallBalanceDisplay();
+                }, itemType, itemId);
+            }
+        };
+
+        const AuthController = {
+            USERNAME: "DARSON", PASSWORD: "AFRASIAB",
+            handleLogin: () => {
+                const u = document.getElementById('username').value.toUpperCase(), p = document.getElementById('password').value, errEl = document.getElementById('authError');
+                if (u === AuthController.USERNAME && p === AuthController.PASSWORD) { errEl.classList.add('hidden'); if (typeof AppState.authCallback === 'function') AppState.authCallback(); UIController.hideAuthModal(); }
+                else { errEl.textContent = 'Invalid credentials.'; errEl.classList.remove('hidden'); }
+            }
+        };
+        
+        const DataResetService = {
+            initiateFullResetProcess: () => {
+                Utils.showConfirmationModal(
+                    "Confirm Data Reset", 
+                    "Are you sure you want to start the full application data reset process? This is irreversible.",
+                    () => { 
+                        UIController.showAuthModal(() => { 
+                            DataResetService.finalConfirmationForReset();
+                        }, 'fullReset', null); 
+                    },
+                    () => { Utils.showMessage('Cancelled', 'Data reset process cancelled.'); } 
+                );
+            },
+            finalConfirmationForReset: () => {
+                Utils.showConfirmationModal(
+                    "FINAL WARNING: Erase All Data?",
+                    "All application data (transactions, reports, balances, settings, etc.) will be PERMANENTLY ERASED. This action CANNOT BE UNDONE. Are you absolutely sure you want to proceed?",
+                    () => { 
+                        DataResetService.performFullReset();
+                    },
+                    () => { Utils.showMessage('Cancelled', 'Final data reset cancelled.'); } 
+                );
+            },
+            performFullReset: () => {
+                StorageService.clearAllAppData(); 
+                AppState.currentTransactions = []; AppState.dailyDataCache = {}; AppState.monthlyDataCache = {};
+                AppState.targetDateForDashboard = Utils.getTodayDateString(); // Reset target date
+                Utils.showMessage('Success', 'All application data has been reset successfully.');
+                // Refresh all relevant UI parts
+                UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); // This handles dashboard reset
+                BalanceTrackingController.updateOverallBalanceDisplay(); 
+                BalanceTrackingController.loadAdjustmentHistory(); 
+                PaymentRequestController.loadRequests(); 
+                CourierTrackingController.loadEntries(); 
+                BranchBudgetController.loadEntries(); 
+                if (AppState.currentPage === 'reports') {
+                    document.getElementById('dailyReportDisplay').classList.add('hidden').innerHTML = '';
+                    document.getElementById('monthlyReportDisplay').classList.add('hidden').innerHTML = '';
+                }
+                // No need to navigate, loadTransactionsForDashboard will refresh if on dashboard.
+                // If on another page, it will be refreshed when navigated to.
+            }
+        };
+
+
+        const BalanceTrackingController = {
+            SETTINGS_KEY: 'appSettings', ADJUSTMENT_HISTORY_KEY: 'balanceAdjustments',
+            getSettings: () => StorageService.getItem(BalanceTrackingController.SETTINGS_KEY) || { overallBalance: 0, lastFinalizedMonth: null },
+            saveSettings: (s) => StorageService.setItem(BalanceTrackingController.SETTINGS_KEY, s),
+            getAdjustmentHistory: () => StorageService.getItem(BalanceTrackingController.ADJUSTMENT_HISTORY_KEY) || [],
+            saveAdjustmentHistory: (h) => StorageService.setItem(BalanceTrackingController.ADJUSTMENT_HISTORY_KEY, h),
+
+            updateOverallBalanceDisplay: () => {
+                let bal = 0; const keys = StorageService.getAllKeysWithSubPrefix('transactions_');
+                keys.forEach(k => { const d = StorageService.getItem(k); if (d && d.finalHouseCommission) bal += d.finalHouseCommission; });
+                const adj = BalanceTrackingController.getAdjustmentHistory(); adj.forEach(a => bal += a.amount);
+                const s = BalanceTrackingController.getSettings(); s.overallBalance = bal; BalanceTrackingController.saveSettings(s);
+                document.getElementById('currentOverallBalance').textContent = Utils.formatCurrency(s.overallBalance);
+            },
+            updateBalanceOnSave: () => BalanceTrackingController.updateOverallBalanceDisplay(),
+            addManualBalanceAdjustment: () => {
+                const amtIn = document.getElementById('manualCommissionAmount'), rsnIn = document.getElementById('manualCommissionReason');
+                const amt = parseFloat(amtIn.value), rsn = rsnIn.value.trim();
+                if (isNaN(amt) || amt === 0) { Utils.showMessage('Validation Error', 'Enter valid non-zero amount.'); return; }
+                if (!rsn) { Utils.showMessage('Validation Error', 'Enter reason.'); return; }
+                const adj = { id: Utils.generateId(), date: Utils.getTodayDateString(), amount: amt, reason: rsn, type: amt > 0 ? 'Credit' : 'Debit' };
+                const hist = BalanceTrackingController.getAdjustmentHistory(); hist.unshift(adj); BalanceTrackingController.saveAdjustmentHistory(hist);
+                BalanceTrackingController.updateOverallBalanceDisplay(); BalanceTrackingController.loadAdjustmentHistory();
+                amtIn.value = ''; rsnIn.value = ''; Utils.showMessage('Success', 'Balance adjusted.');
+            },
+            loadAdjustmentHistory: () => {
+                const hist = BalanceTrackingController.getAdjustmentHistory(), tbody = document.getElementById('balanceAdjustmentHistoryTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
+                if (hist.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-3">No adjustments.</td></tr>'; return; }
+                hist.forEach(adj => {
+                    const r = tbody.insertRow(); r.insertCell().textContent = Utils.formatDateForDisplay(adj.date); r.insertCell().textContent = adj.reason;
+                    r.insertCell().textContent = Utils.formatCurrency(adj.amount); r.insertCell().textContent = adj.type;
+                    r.cells[2].classList.toggle('text-green-600', adj.amount > 0); r.cells[2].classList.toggle('text-red-600', adj.amount < 0);
+                });
+            },
+            finalizeCurrentMonth: () => {
+                const cmy = Utils.getCurrentMonthYearString(), s = BalanceTrackingController.getSettings();
+                if (s.lastFinalizedMonth === cmy) { Utils.showMessage('Info', `Month ${Utils.formatMonthForDisplay(cmy)} already finalized.`); return; }
+                const keys = StorageService.getAllKeysWithSubPrefix('transactions_'); let me = 0;
+                keys.forEach(k => { if (k.startsWith(`transactions_${cmy}`)) { const d = StorageService.getItem(k); if (d && d.finalHouseCommission) me += d.finalHouseCommission; } });
+                s.lastFinalizedMonth = cmy; BalanceTrackingController.saveSettings(s);
+                const stEl = document.getElementById('newMonthStatus');
+                stEl.textContent = `Month ${Utils.formatMonthForDisplay(cmy)} finalized (Earnings: ${Utils.formatCurrency(me)}). Ready for new month.`;
+                stEl.classList.add('text-green-600'); Utils.showMessage('Month Finalized', `Month ${Utils.formatMonthForDisplay(cmy)} earnings: ${Utils.formatCurrency(me)}.`);
+            }
+        };
+
+        const PaymentRequestController = {
+            STORAGE_KEY: 'paymentRequests',
+            getRequests: () => StorageService.getItem(PaymentRequestController.STORAGE_KEY) || [],
+            saveRequests: (r) => StorageService.setItem(PaymentRequestController.STORAGE_KEY, r),
+
+            handleAddRequest: (e) => {
+                e.preventDefault(); const d = document.getElementById('paymentRequestDate').value, a = parseFloat(document.getElementById('paymentRequestAmount').value), desc = document.getElementById('paymentRequestDescription').value.trim();
+                if (!d || isNaN(a) || a <= 0 || !desc) { Utils.showMessage('Validation Error', 'Fill all fields.'); return; }
+                const nr = { id: Utils.generateId(), requestDate: d, amount: a, description: desc, status: 'Pending', entryDate: Utils.getTodayDateString() };
+                const rs = PaymentRequestController.getRequests(); rs.unshift(nr); PaymentRequestController.saveRequests(rs);
+                PaymentRequestController.loadRequests(); document.getElementById('paymentRequestForm').reset(); Utils.showMessage('Success', 'Request submitted.');
+            },
+            loadRequests: () => {
+                const rs = PaymentRequestController.getRequests(), tbody = document.getElementById('paymentRequestsTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
+                if (rs.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-3">No requests.</td></tr>'; }
+                else { rs.forEach(req => {
+                        const r = tbody.insertRow(); r.insertCell().textContent = req.id.slice(-6).toUpperCase(); r.insertCell().textContent = Utils.formatDateForDisplay(req.requestDate);
+                        r.insertCell().textContent = Utils.formatCurrency(req.amount); r.insertCell().textContent = req.description;
+                        const sc = r.insertCell(), ss = document.createElement('select'); ss.classList.add('p-1','border','rounded-md','text-sm','bg-white');
+                        ['Pending','Approved','Paid','Rejected'].forEach(s => { const o=document.createElement('option'); o.value=s; o.textContent=s; if(s===req.status)o.selected=true; ss.appendChild(o); });
+                        ss.onchange=(e)=>PaymentRequestController.updateStatus(req.id,e.target.value); sc.appendChild(ss);
+                        const ac = r.insertCell(), delBtn = document.createElement('button'); delBtn.innerHTML='<i class="fas fa-trash-alt"></i>'; delBtn.classList.add('btn','btn-danger','btn-icon','text-xs');
+                        delBtn.onclick=()=>PaymentRequestController.deleteRequest(req.id); ac.appendChild(delBtn);
+                    }); }
+                PaymentRequestController.updatePaymentSummary();
+            },
+            updateStatus: (id, newStatus) => {
+                let rs = PaymentRequestController.getRequests(); rs = rs.map(req => req.id === id ? { ...req, status: newStatus } : req);
+                PaymentRequestController.saveRequests(rs); Utils.showMessage('Status Updated', `Request status: ${newStatus}.`); PaymentRequestController.updatePaymentSummary();
+            },
+            deleteRequest: (id) => {
+                Utils.showConfirmationModal('Delete Request', 'Are you sure you want to delete this payment request?', () => {
+                    let rs = PaymentRequestController.getRequests(); rs = rs.filter(req => req.id !== id);
+                    PaymentRequestController.saveRequests(rs); PaymentRequestController.loadRequests(); Utils.showMessage('Deleted', 'Request deleted.');
+                });
+            },
+            updatePaymentSummary: () => {
+                const rs = PaymentRequestController.getRequests(), cm = Utils.getCurrentMonthYearString();
+                document.getElementById('paymentSummaryMonth').textContent = Utils.formatMonthForDisplay(cm);
+                let tr=0, ta=0, tp=0; rs.filter(req => req.requestDate.startsWith(cm)).forEach(req => { tr+=req.amount; if(req.status==='Approved'||req.status==='Paid')ta+=req.amount; if(req.status==='Paid')tp+=req.amount; });
+                const ua = ta - tp;
+                document.getElementById('totalRequestedAmount').textContent=Utils.formatCurrency(tr); document.getElementById('totalApprovedAmount').textContent=Utils.formatCurrency(ta);
+                document.getElementById('totalPaidAmount').textContent=Utils.formatCurrency(tp); document.getElementById('totalUnpaidApprovedAmount').textContent=Utils.formatCurrency(ua);
+            },
+            carryOverUnpaidApproved: () => {
+                const rs = PaymentRequestController.getRequests(), cm = Utils.getCurrentMonthYearString(); let uaa = 0;
+                rs.filter(req => req.requestDate.startsWith(cm) && req.status === 'Approved').forEach(req => uaa += req.amount);
+                rs.filter(req => req.requestDate.startsWith(cm) && req.status === 'Paid').forEach(req => uaa -= req.amount); // Subtract paid from approved
+                uaa = Math.max(0, uaa);
+                if (uaa <= 0) { Utils.showMessage('No Amount', 'No unpaid approved amounts to carry over.'); return; }
+                Utils.showConfirmationModal('Carry Over Balance', `Carry over ${Utils.formatCurrency(uaa)} (unpaid approved from ${Utils.formatMonthForDisplay(cm)}) to balance adjustments?`, () => {
+                    const rsn = `Carried over unpaid approved requests from ${Utils.formatMonthForDisplay(cm)}`;
+                    const amtIn = document.getElementById('manualCommissionAmount'), rsnIn = document.getElementById('manualCommissionReason');
+                    const origAmt = amtIn.value, origRsn = rsnIn.value; // Backup existing form values
+                    amtIn.value = uaa; rsnIn.value = rsn; BalanceTrackingController.addManualBalanceAdjustment();
+                    amtIn.value = origAmt; rsnIn.value = origRsn; // Restore form values
+                    Utils.showMessage('Carried Over', `${Utils.formatCurrency(uaa)} added to balance adjustments.`);
+                });
+            }
+        };
+        
+        const CourierTrackingController = {
+            STORAGE_KEY: 'courierEntries',
+            getEntries: () => StorageService.getItem(CourierTrackingController.STORAGE_KEY) || [],
+            saveEntries: (e) => StorageService.setItem(CourierTrackingController.STORAGE_KEY, e),
+
+            handleAddEntry: (e) => {
+                e.preventDefault(); const typ = document.getElementById('courierType').value, dt = document.getElementById('courierDateSent').value, tid = document.getElementById('courierTrackingId').value.trim(),
+                sn = document.getElementById('courierSenderName').value.trim(), rn = document.getElementById('courierReceiverName').value.trim(), dst = document.getElementById('courierDestination').value.trim(),
+                st = document.getElementById('courierStatus').value.trim(), dsc = document.getElementById('courierDescription').value.trim();
+                if (!dt||!sn||!rn||!dst||!st) { Utils.showMessage('Validation Error', 'Fill required courier fields.'); return; }
+                const ne = { id:Utils.generateId(),type:typ,date:dt,trackingId:tid,senderName:sn,receiverName:rn,destination:dst,status:st,description:dsc,entryDate:Utils.getTodayDateString() };
+                const es = CourierTrackingController.getEntries(); es.unshift(ne); CourierTrackingController.saveEntries(es);
+                CourierTrackingController.loadEntries(); document.getElementById('courierTrackingForm').reset(); Utils.showMessage('Success', 'Courier entry added.');
+            },
+            loadEntries: () => {
+                const es = CourierTrackingController.getEntries(), tbody = document.getElementById('courierTrackingTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
+                if (es.length === 0) { tbody.innerHTML = '<tr><td colspan="10" class="text-center text-gray-500 py-3">No courier records.</td></tr>'; return; }
+                es.forEach(en => {
+                    const r = tbody.insertRow(); r.insertCell().textContent = en.id.slice(-6).toUpperCase(); r.insertCell().textContent = en.type.charAt(0).toUpperCase()+en.type.slice(1);
+                    r.insertCell().textContent = Utils.formatDateForDisplay(en.date); r.insertCell().textContent = en.trackingId||'N/A'; r.insertCell().textContent = en.senderName;
+                    r.insertCell().textContent = en.receiverName; r.insertCell().textContent = en.destination; r.insertCell().textContent = en.description||'N/A';
+                    const sc = r.insertCell(), si = document.createElement('input'); si.type='text'; si.value=en.status; si.classList.add('p-1','border','rounded-md','text-sm','w-full','bg-white');
+                    si.onchange=(e)=>CourierTrackingController.updateStatus(en.id,e.target.value); sc.appendChild(si);
+                    const ac = r.insertCell(), delBtn = document.createElement('button'); delBtn.innerHTML='<i class="fas fa-trash-alt"></i>'; delBtn.classList.add('btn','btn-danger','btn-icon','text-xs');
+                    delBtn.onclick=()=>CourierTrackingController.deleteEntry(en.id); ac.appendChild(delBtn);
+                });
+            },
+            updateStatus: (id, newStatus) => {
+                let es = CourierTrackingController.getEntries(); es = es.map(e => e.id === id ? { ...e, status: newStatus } : e); CourierTrackingController.saveEntries(es);
+            },
+            deleteEntry: (id) => {
+                 Utils.showConfirmationModal('Delete Courier Entry', 'Are you sure you want to delete this courier entry?', () => {
+                    let es = CourierTrackingController.getEntries(); es = es.filter(e => e.id !== id); CourierTrackingController.saveEntries(es);
+                    CourierTrackingController.loadEntries(); Utils.showMessage('Deleted', 'Courier entry deleted.');
+                });
+            }
+        };
+
+        const BranchBudgetController = {
+            STORAGE_KEY: 'branchBudgetEntries', tempBillImageBase64: null,
+            getEntries: () => StorageService.getItem(BranchBudgetController.STORAGE_KEY) || [],
+            saveEntries: (e) => StorageService.setItem(BranchBudgetController.STORAGE_KEY, e),
+
+            previewBillImage: (ev) => {
+                const f = ev.target.files[0], p = document.getElementById('billImagePreview');
+                if (f) { const rdr = new FileReader(); rdr.onload = (e) => { p.src = e.target.result; p.classList.remove('hidden'); BranchBudgetController.tempBillImageBase64 = e.target.result; }; rdr.readAsDataURL(f); }
+                else { p.classList.add('hidden'); p.src = "#"; BranchBudgetController.tempBillImageBase64 = null; }
+            },
+            handleAddEntry: (e) => {
+                e.preventDefault(); const dt = document.getElementById('budgetEntryDate').value, itm = document.getElementById('budgetItem').value.trim(), amt = parseFloat(document.getElementById('budgetAmount').value);
+                if (!dt||!itm||isNaN(amt)||amt<=0) { Utils.showMessage('Validation Error', 'Fill Date, Item, and Amount.'); return; }
+                const ne = {id:Utils.generateId(),date:dt,item:itm,amount:amt,billImageBase64:BranchBudgetController.tempBillImageBase64,entryDate:Utils.getTodayDateString()};
+                const es = BranchBudgetController.getEntries(); es.unshift(ne); BranchBudgetController.saveEntries(es); BranchBudgetController.loadEntries();
+                document.getElementById('branchBudgetForm').reset(); document.getElementById('billImagePreview').classList.add('hidden'); BranchBudgetController.tempBillImageBase64 = null;
+                Utils.showMessage('Success', 'Budget entry added.');
+            },
+            loadEntries: () => {
+                const es = BranchBudgetController.getEntries(), tbody = document.getElementById('branchBudgetTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
+                if (es.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-3">No budget entries.</td></tr>'; return; }
+                es.forEach(en => {
+                    const r = tbody.insertRow(); r.insertCell().textContent = en.id.slice(-6).toUpperCase(); r.insertCell().textContent = Utils.formatDateForDisplay(en.date);
+                    r.insertCell().textContent = en.item; r.insertCell().textContent = Utils.formatCurrency(en.amount);
+                    const bc = r.insertCell(); 
+                    if (en.billImageBase64) { 
+                        const viewBtn = document.createElement('button');
+                        viewBtn.textContent = 'View Bill';
+                        viewBtn.classList.add('text-blue-600', 'hover:underline', 'text-sm', 'p-0', 'bg-transparent', 'border-none', 'cursor-pointer');
+                        viewBtn.onclick = () => BranchBudgetController.showBillPreviewModal(en.billImageBase64, en.item);
+                        bc.appendChild(viewBtn);
+                    } else { 
+                        bc.textContent='No Bill'; 
+                    }
+                    const ac = r.insertCell(); ac.classList.add('action-column'); const delBtn = document.createElement('button'); delBtn.innerHTML='<i class="fas fa-trash-alt"></i>'; delBtn.classList.add('btn','btn-danger','btn-icon','text-xs');
+                    delBtn.onclick=()=>BranchBudgetController.deleteEntry(en.id); ac.appendChild(delBtn);
+                });
+            },
+            deleteEntry: (id) => {
+                Utils.showConfirmationModal('Delete Budget Entry', 'Are you sure you want to delete this budget entry?', () => {
+                    let es = BranchBudgetController.getEntries(); es = es.filter(e => e.id !== id); BranchBudgetController.saveEntries(es);
+                    BranchBudgetController.loadEntries(); Utils.showMessage('Deleted', 'Budget entry deleted.');
+                });
+            },
+            showBillPreviewModal: (imageBase64, itemName) => {
+                document.getElementById('billPreviewModalTitle').textContent = `Bill Preview: ${itemName || 'Bill'}`;
+                const imgElement = document.getElementById('billPreviewImageElement');
+                imgElement.src = imageBase64;
+                
+                document.getElementById('printBillFromModalBtn').dataset.billImage = imageBase64;
+                document.getElementById('billPreviewModal').classList.remove('hidden');
+            },
+            hideBillPreviewModal: () => {
+                document.getElementById('billPreviewModal').classList.add('hidden');
+                document.getElementById('billPreviewImageElement').src = "#"; 
+                delete document.getElementById('printBillFromModalBtn').dataset.billImage; 
+            },
+            printSpecificBill: () => {
+                const imageBase64 = document.getElementById('printBillFromModalBtn').dataset.billImage;
+                if (!imageBase64) { Utils.showMessage('Error', 'No bill image data found to print.'); return; }
+                const printWindow = window.open('', '_blank', 'height=700,width=900'); 
+                printWindow.document.write('<html><head><title>Print Bill</title>');
+                printWindow.document.write('<style> body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; } img { max-width: 100%; max-height: 95vh; object-fit: contain; } @page { size: auto; margin: 20mm; } </style>');
+                printWindow.document.write('</head><body>');
+                printWindow.document.write('<img src="' + imageBase64 + '" onload="window.focus(); window.print(); setTimeout(function(){ printWindow.close(); }, 500);">');
+                printWindow.document.write('</body></html>');
+                printWindow.document.close(); 
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', UIController.init);
+    </script>
 </body>
 </html>
