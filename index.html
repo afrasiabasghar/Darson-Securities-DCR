@@ -405,7 +405,7 @@
                     <div class="p-6 bg-blue-50 rounded-lg shadow">
                         <h3 class="text-xl font-semibold text-blue-700 mb-2">Current Overall Balance</h3>
                         <p id="currentOverallBalance" class="text-3xl font-bold text-blue-800">PKR 0.00</p>
-                        <p class="text-sm text-gray-600">This balance reflects the cumulative final house commission after all deductions from saved daily transactions.</p>
+                        <p class="text-sm text-gray-600">This balance reflects the cumulative final house commission after all deductions from saved daily transactions and adjustments.</p>
                     </div>
                     <div class="p-6 bg-green-50 rounded-lg shadow">
                         <h3 class="text-xl font-semibold text-green-700 mb-2">Manual Balance Adjustment</h3>
@@ -592,11 +592,13 @@
                             <input type="number" id="budgetAmount" class="mt-1 w-full" min="0.01" step="0.01" required>
                         </div>
                         <div>
-                            <label for="budgetBillImage" class="block text-sm font-medium">Upload Bill (Image)</label>
-                            <input type="file" id="budgetBillImage" accept="image/*" class="mt-1 w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                            <label for="budgetBillImages" class="block text-sm font-medium">Upload Bill(s) (Image)</label>
+                            <input type="file" id="budgetBillImages" accept="image/*" multiple class="mt-1 w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                         </div>
                         <div class="md:col-span-2">
-                            <img id="billImagePreview" src="#" alt="Bill Preview" class="hidden mt-2 max-h-48 rounded border p-1">
+                            <div id="billImagePreviewsContainer" class="hidden mt-2 flex flex-wrap gap-2 p-2 border rounded-md bg-gray-50 min-h-[50px]">
+                                <!-- Image previews will be shown here -->
+                            </div>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary mt-4"><i class="fas fa-save mr-2"></i>Save Budget Entry</button>
@@ -614,7 +616,7 @@
                                 <th>Date</th>
                                 <th>Item</th>
                                 <th>Amount</th>
-                                <th>Bill</th>
+                                <th>Bill(s)</th>
                                 <th class="action-column">Actions</th>
                             </tr>
                         </thead>
@@ -661,13 +663,13 @@
 
             <!-- Bill Preview Modal -->
             <div id="billPreviewModal" class="modal hidden">
-                <div class="modal-content modal-lg"> <!-- Added modal-lg for potentially larger images -->
+                <div class="modal-content modal-lg"> 
                     <h3 id="billPreviewModalTitle" class="modal-title">Bill Preview</h3>
-                    <div class="my-4 flex justify-center bg-gray-100 p-2 rounded">
-                        <img id="billPreviewImageElement" src="#" alt="Bill Preview" class="max-w-full max-h-[70vh] object-contain">
+                    <div id="billPreviewImagesContainer" class="my-4 flex flex-col items-center gap-4 max-h-[70vh] overflow-y-auto bg-gray-100 p-2 rounded">
+                        <!-- Multiple bill images will be shown here -->
                     </div>
                     <div class="mt-6 flex justify-end space-x-3">
-                        <button id="printBillFromModalBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Bill</button>
+                        <button id="printBillFromModalBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Current Bill</button>
                         <button id="closeBillPreviewModalBtn" class="btn btn-primary">Close</button>
                     </div>
                 </div>
@@ -741,8 +743,8 @@
         // --- APPLICATION STATE AND DATA MANAGEMENT ---
         const AppState = {
             currentPage: 'dashboard',
-            currentTransactions: [], // Holds transactions for the date currently active on the dashboard
-            targetDateForDashboard: Utils.getTodayDateString(), // Date dashboard is currently operating on
+            currentTransactions: [], 
+            targetDateForDashboard: Utils.getTodayDateString(), 
             dailyDataCache: {}, 
             monthlyDataCache: {}, 
             authCallback: null, 
@@ -811,18 +813,16 @@
                 document.getElementById('mobileMenuButton').addEventListener('click', () => document.getElementById('navLinks').classList.toggle('hidden'));
 
                 // Set dates
-                document.getElementById('dashboardDateInput').value = AppState.targetDateForDashboard; // Set initial value
+                document.getElementById('dashboardDateInput').value = AppState.targetDateForDashboard; 
                 document.getElementById('reportDate').value = Utils.getTodayDateString();
                 document.getElementById('reportMonth').value = Utils.getCurrentMonthYearString();
 
                 // Dashboard Listeners
                 document.getElementById('dashboardDateInput').addEventListener('change', () => {
-                    // Update AppState.targetDateForDashboard when input changes, then load.
                     AppState.targetDateForDashboard = document.getElementById('dashboardDateInput').value || Utils.getTodayDateString();
                     UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard);
                 });
                 document.getElementById('loadDashboardDateBtn').addEventListener('click', () => {
-                    // Explicitly load based on current input value
                     const selectedDate = document.getElementById('dashboardDateInput').value || Utils.getTodayDateString();
                     UIController.loadTransactionsForDashboard(selectedDate);
                 });
@@ -831,7 +831,7 @@
                 document.getElementById('saveDayTransactionsBtn').addEventListener('click', UIController.saveCurrentDayTransactions);
                 document.getElementById('printDayTransactionsBtn').addEventListener('click', () => UIController.printReport('daily_current'));
 
-                // Reports Page Listeners (same as before)
+                // Reports Page Listeners
                 document.getElementById('viewDailyReportBtn').addEventListener('click', UIController.displayDailyReport);
                 document.getElementById('printDailyReportBtn').addEventListener('click', () => UIController.printReport('daily_historical'));
                 document.getElementById('deleteDailyReportBtn').addEventListener('click', () => {
@@ -861,16 +861,16 @@
 
                 // Branch Budget Listeners
                 document.getElementById('branchBudgetForm').addEventListener('submit', BranchBudgetController.handleAddEntry);
-                document.getElementById('budgetBillImage').addEventListener('change', BranchBudgetController.previewBillImage);
+                document.getElementById('budgetBillImages').addEventListener('change', BranchBudgetController.previewBillImages); // Changed ID and handler
                 document.getElementById('printBudgetReportBtn').addEventListener('click', () => UIController.printReport('branchBudget'));
                 document.getElementById('closeBillPreviewModalBtn').addEventListener('click', BranchBudgetController.hideBillPreviewModal);
-                document.getElementById('printBillFromModalBtn').addEventListener('click', BranchBudgetController.printSpecificBill);
+                document.getElementById('printBillFromModalBtn').addEventListener('click', BranchBudgetController.printSpecificBillFromModal);
 
                 // Modal Listeners
                 document.getElementById('cancelAuthBtn').addEventListener('click', UIController.hideAuthModal);
                 document.getElementById('submitAuthBtn').addEventListener('click', AuthController.handleLogin);
                 
-                UIController.navigateTo('dashboard'); // This will also call loadTransactionsForDashboard for today
+                UIController.navigateTo('dashboard'); 
             },
 
             navigateTo: (pageId) => {
@@ -878,7 +878,7 @@
                 const targetPage = document.getElementById(pageId + 'Page');
                 if (targetPage) {
                     targetPage.classList.remove('hidden'); AppState.currentPage = pageId;
-                    if (pageId === 'dashboard') UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); // Load for current target or default to today
+                    if (pageId === 'dashboard') UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); 
                     if (pageId === 'balanceTracking') { BalanceTrackingController.updateOverallBalanceDisplay(); BalanceTrackingController.loadAdjustmentHistory(); }
                     if (pageId === 'paymentRequests') PaymentRequestController.loadRequests();
                     if (pageId === 'courierTracking') CourierTrackingController.loadEntries();
@@ -888,8 +888,8 @@
             },
 
             loadTransactionsForDashboard: (dateString) => {
-                AppState.targetDateForDashboard = dateString; // Update the active date
-                document.getElementById('dashboardDateInput').value = dateString; // Sync date picker
+                AppState.targetDateForDashboard = dateString; 
+                document.getElementById('dashboardDateInput').value = dateString; 
                 
                 const displayDate = Utils.formatDateForDisplay(dateString);
                 const isToday = dateString === Utils.getTodayDateString();
@@ -897,21 +897,18 @@
                 document.getElementById('currentDateDisplay').textContent = dateLabel;
                 document.getElementById('summaryDateDisplay').textContent = displayDate;
 
-
                 const data = StorageService.getItem(`transactions_${dateString}`);
                 if (data && data.transactions) {
-                    // Ensure transactions have a temporary unique ID for UI manipulation (like removal before save)
                     AppState.currentTransactions = data.transactions.map(tx => ({...tx, tempId: tx.tempId || Utils.generateId()}));
                     Utils.showMessage('Data Loaded', `Loaded transactions for ${displayDate}. You can add more or modify.`);
                 } else {
-                    AppState.currentTransactions = []; // Start fresh for this date
+                    AppState.currentTransactions = []; 
                     Utils.showMessage('No Data', `No transactions found for ${displayDate}. You can add new ones.`);
                 }
-                UIController.renderCurrentTransactionsTable(); // Renders AppState.currentTransactions
-                UIController.updateDailySummaryDisplay();    // Calculates summary from AppState.currentTransactions
-                UIController.resetDashboardCalculatorFields(); // Clears input fields for new entry
+                UIController.renderCurrentTransactionsTable(); 
+                UIController.updateDailySummaryDisplay();    
+                UIController.resetDashboardCalculatorFields(); 
             },
-
 
             updateDashboardCommissionDisplay: () => {
                 const q = parseFloat(document.getElementById('quantity').value) || 0, r = parseFloat(document.getElementById('rate').value) || 0;
@@ -924,9 +921,8 @@
                 const sn = document.getElementById('stockName').value.trim(), q = parseInt(document.getElementById('quantity').value), r = parseFloat(document.getElementById('rate').value);
                 if (!sn || isNaN(q) || q <= 0 || isNaN(r) || r <= 0) { Utils.showMessage('Validation Error', 'Enter valid Stock Name, Quantity, and Rate.'); return; }
                 const { commissionPerStock, totalStockCommission } = CommissionService.calculateCommission(r, q);
-                // Add to AppState.currentTransactions, which holds all transactions for the AppState.targetDateForDashboard
                 AppState.currentTransactions.push({ 
-                    tempId: Utils.generateId(), // Temporary ID for UI removal before saving
+                    tempId: Utils.generateId(), 
                     stockName: sn, quantity: q, rate: r, 
                     commissionPerStock, totalStockCommission, 
                     transactionTime: new Date().toLocaleTimeString() 
@@ -953,18 +949,18 @@
                     row.insertCell().textContent = Utils.formatCurrency(tx.totalStockCommission);
                     const ac = row.insertCell(); const rmBtn = document.createElement('button'); 
                     rmBtn.innerHTML = '<i class="fas fa-trash-alt"></i>'; rmBtn.classList.add('btn', 'btn-danger', 'btn-icon', 'text-xs');
-                    rmBtn.onclick = () => UIController.removeTransactionFromCurrentList(tx.tempId); // Use tempId
+                    rmBtn.onclick = () => UIController.removeTransactionFromCurrentList(tx.tempId); 
                     ac.appendChild(rmBtn);
                 });
             },
 
-            removeTransactionFromCurrentList: (tempId) => { // Use tempId
+            removeTransactionFromCurrentList: (tempId) => { 
                 AppState.currentTransactions = AppState.currentTransactions.filter(tx => tx.tempId !== tempId);
                 UIController.renderCurrentTransactionsTable(); 
                 UIController.updateDailySummaryDisplay();
             },
 
-            updateDailySummaryDisplay: () => { // Calculates from AppState.currentTransactions
+            updateDailySummaryDisplay: () => { 
                 const gc = AppState.currentTransactions.reduce((s, tx) => s + tx.totalStockCommission, 0);
                 const d = CommissionService.calculateDeductions(gc);
                 document.getElementById('dailyGrossCommission').textContent = Utils.formatCurrency(d.grossCommission);
@@ -975,10 +971,6 @@
 
             saveCurrentDayTransactions: () => {
                 const targetDate = AppState.targetDateForDashboard;
-
-                // AppState.currentTransactions holds ALL transactions for the targetDate (loaded + newly added)
-                // If it's empty, but there was data before, this means the user deleted all and wants to save an empty day.
-                // If it's empty and there was no data before, then don't save.
                 const existingDataForDate = StorageService.getItem(`transactions_${targetDate}`);
                 if (AppState.currentTransactions.length === 0 && !existingDataForDate) {
                     Utils.showMessage('No Transactions', `No transactions to save for ${Utils.formatDateForDisplay(targetDate)}.`);
@@ -987,11 +979,9 @@
 
                 const grossCommission = AppState.currentTransactions.reduce((sum, tx) => sum + tx.totalStockCommission, 0);
                 const deductions = CommissionService.calculateDeductions(grossCommission);
-
-                // Prepare transactions for saving by removing the temporary UI 'tempId'
                 const transactionsToSave = AppState.currentTransactions.map(tx => {
-                    const { tempId, ...rest } = tx; // Destructure to exclude tempId
-                    return { ...rest, transactionTime: tx.transactionTime || new Date().toLocaleTimeString() }; // Ensure time
+                    const { tempId, ...rest } = tx; 
+                    return { ...rest, transactionTime: tx.transactionTime || new Date().toLocaleTimeString() }; 
                 });
 
                 const dailyReportDataToSave = {
@@ -1001,11 +991,9 @@
                 };
 
                 StorageService.setItem(`transactions_${targetDate}`, dailyReportDataToSave);
-                BalanceTrackingController.updateOverallBalanceDisplay(); // Recalculates from all stored data
-
+                BalanceTrackingController.updateOverallBalanceDisplay(); 
                 Utils.showMessage('Success', `Transactions for ${Utils.formatDateForDisplay(targetDate)} saved successfully.`);
-                UIController.resetDashboardCalculatorFields(); // Clear input fields for next entry
-                // The dashboard already reflects the saved state, so no need to reload AppState.currentTransactions here.
+                UIController.resetDashboardCalculatorFields(); 
             },
 
             displayDailyReport: () => {
@@ -1069,7 +1057,7 @@
                 titleEl.textContent = rTitle; dateEl.textContent = rDateStr; const origBody = document.body.innerHTML;
                 document.body.innerHTML = document.querySelector('.print-header').outerHTML + content + document.querySelector('.print-footer').outerHTML;
                 window.print(); document.body.innerHTML = origBody; UIController.init(); UIController.navigateTo(AppState.currentPage);
-                if (AppState.currentPage === 'dashboard') { UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); } // Ensure dashboard reloads correctly
+                if (AppState.currentPage === 'dashboard') { UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); } 
                 if (AppState.currentPage === 'reports') { if (document.getElementById('reportDate').value && AppState.dailyDataCache[document.getElementById('reportDate').value]) UIController.displayDailyReport(); if (document.getElementById('reportMonth').value && AppState.monthlyDataCache[document.getElementById('reportMonth').value]) UIController.displayMonthlyReport(); }
                 if (AppState.currentPage === 'paymentRequests') PaymentRequestController.loadRequests(); if (AppState.currentPage === 'courierTracking') CourierTrackingController.loadEntries(); if (AppState.currentPage === 'branchBudget') BranchBudgetController.loadEntries();
             },
@@ -1092,7 +1080,7 @@
         };
 
         const AuthController = {
-            USERNAME: "DARSON", PASSWORD: "AFRASIAB",
+            USERNAME: "DARSON", PASSWORD: "AFRASIAB", 
             handleLogin: () => {
                 const u = document.getElementById('username').value.toUpperCase(), p = document.getElementById('password').value, errEl = document.getElementById('authError');
                 if (u === AuthController.USERNAME && p === AuthController.PASSWORD) { errEl.classList.add('hidden'); if (typeof AppState.authCallback === 'function') AppState.authCallback(); UIController.hideAuthModal(); }
@@ -1126,10 +1114,9 @@
             performFullReset: () => {
                 StorageService.clearAllAppData(); 
                 AppState.currentTransactions = []; AppState.dailyDataCache = {}; AppState.monthlyDataCache = {};
-                AppState.targetDateForDashboard = Utils.getTodayDateString(); // Reset target date
+                AppState.targetDateForDashboard = Utils.getTodayDateString(); 
                 Utils.showMessage('Success', 'All application data has been reset successfully.');
-                // Refresh all relevant UI parts
-                UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); // This handles dashboard reset
+                UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); 
                 BalanceTrackingController.updateOverallBalanceDisplay(); 
                 BalanceTrackingController.loadAdjustmentHistory(); 
                 PaymentRequestController.loadRequests(); 
@@ -1139,11 +1126,8 @@
                     document.getElementById('dailyReportDisplay').classList.add('hidden').innerHTML = '';
                     document.getElementById('monthlyReportDisplay').classList.add('hidden').innerHTML = '';
                 }
-                // No need to navigate, loadTransactionsForDashboard will refresh if on dashboard.
-                // If on another page, it will be refreshed when navigated to.
             }
         };
-
 
         const BalanceTrackingController = {
             SETTINGS_KEY: 'appSettings', ADJUSTMENT_HISTORY_KEY: 'balanceAdjustments',
@@ -1154,18 +1138,17 @@
 
             updateOverallBalanceDisplay: () => {
                 let bal = 0; const keys = StorageService.getAllKeysWithSubPrefix('transactions_');
-                keys.forEach(k => { const d = StorageService.getItem(k); if (d && d.finalHouseCommission) bal += d.finalHouseCommission; });
-                const adj = BalanceTrackingController.getAdjustmentHistory(); adj.forEach(a => bal += a.amount);
+                keys.forEach(k => { const d = StorageService.getItem(k); if (d && d.finalHouseCommission) bal += parseFloat(d.finalHouseCommission); });
+                const adj = BalanceTrackingController.getAdjustmentHistory(); adj.forEach(a => bal += parseFloat(a.amount));
                 const s = BalanceTrackingController.getSettings(); s.overallBalance = bal; BalanceTrackingController.saveSettings(s);
                 document.getElementById('currentOverallBalance').textContent = Utils.formatCurrency(s.overallBalance);
             },
-            updateBalanceOnSave: () => BalanceTrackingController.updateOverallBalanceDisplay(),
             addManualBalanceAdjustment: () => {
                 const amtIn = document.getElementById('manualCommissionAmount'), rsnIn = document.getElementById('manualCommissionReason');
                 const amt = parseFloat(amtIn.value), rsn = rsnIn.value.trim();
                 if (isNaN(amt) || amt === 0) { Utils.showMessage('Validation Error', 'Enter valid non-zero amount.'); return; }
                 if (!rsn) { Utils.showMessage('Validation Error', 'Enter reason.'); return; }
-                const adj = { id: Utils.generateId(), date: Utils.getTodayDateString(), amount: amt, reason: rsn, type: amt > 0 ? 'Credit' : 'Debit' };
+                const adj = { id: Utils.generateId(), date: Utils.getTodayDateString(), amount: amt, reason: rsn, type: amt > 0 ? 'Credit' : 'Debit (Manual)' };
                 const hist = BalanceTrackingController.getAdjustmentHistory(); hist.unshift(adj); BalanceTrackingController.saveAdjustmentHistory(hist);
                 BalanceTrackingController.updateOverallBalanceDisplay(); BalanceTrackingController.loadAdjustmentHistory();
                 amtIn.value = ''; rsnIn.value = ''; Utils.showMessage('Success', 'Balance adjusted.');
@@ -1176,14 +1159,14 @@
                 hist.forEach(adj => {
                     const r = tbody.insertRow(); r.insertCell().textContent = Utils.formatDateForDisplay(adj.date); r.insertCell().textContent = adj.reason;
                     r.insertCell().textContent = Utils.formatCurrency(adj.amount); r.insertCell().textContent = adj.type;
-                    r.cells[2].classList.toggle('text-green-600', adj.amount > 0); r.cells[2].classList.toggle('text-red-600', adj.amount < 0);
+                    r.cells[2].classList.toggle('text-green-600', parseFloat(adj.amount) > 0); r.cells[2].classList.toggle('text-red-600', parseFloat(adj.amount) < 0);
                 });
             },
             finalizeCurrentMonth: () => {
                 const cmy = Utils.getCurrentMonthYearString(), s = BalanceTrackingController.getSettings();
                 if (s.lastFinalizedMonth === cmy) { Utils.showMessage('Info', `Month ${Utils.formatMonthForDisplay(cmy)} already finalized.`); return; }
                 const keys = StorageService.getAllKeysWithSubPrefix('transactions_'); let me = 0;
-                keys.forEach(k => { if (k.startsWith(`transactions_${cmy}`)) { const d = StorageService.getItem(k); if (d && d.finalHouseCommission) me += d.finalHouseCommission; } });
+                keys.forEach(k => { if (k.startsWith(`transactions_${cmy}`)) { const d = StorageService.getItem(k); if (d && d.finalHouseCommission) me += parseFloat(d.finalHouseCommission); } });
                 s.lastFinalizedMonth = cmy; BalanceTrackingController.saveSettings(s);
                 const stEl = document.getElementById('newMonthStatus');
                 stEl.textContent = `Month ${Utils.formatMonthForDisplay(cmy)} finalized (Earnings: ${Utils.formatCurrency(me)}). Ready for new month.`;
@@ -1209,7 +1192,7 @@
                 else { rs.forEach(req => {
                         const r = tbody.insertRow(); r.insertCell().textContent = req.id.slice(-6).toUpperCase(); r.insertCell().textContent = Utils.formatDateForDisplay(req.requestDate);
                         r.insertCell().textContent = Utils.formatCurrency(req.amount); r.insertCell().textContent = req.description;
-                        const sc = r.insertCell(), ss = document.createElement('select'); ss.classList.add('p-1','border','rounded-md','text-sm','bg-white');
+                        const sc = r.insertCell(), ss = document.createElement('select'); ss.classList.add('p-1','border','rounded-md','text-sm','bg-white','w-full');
                         ['Pending','Approved','Paid','Rejected'].forEach(s => { const o=document.createElement('option'); o.value=s; o.textContent=s; if(s===req.status)o.selected=true; ss.appendChild(o); });
                         ss.onchange=(e)=>PaymentRequestController.updateStatus(req.id,e.target.value); sc.appendChild(ss);
                         const ac = r.insertCell(), delBtn = document.createElement('button'); delBtn.innerHTML='<i class="fas fa-trash-alt"></i>'; delBtn.classList.add('btn','btn-danger','btn-icon','text-xs');
@@ -1218,8 +1201,44 @@
                 PaymentRequestController.updatePaymentSummary();
             },
             updateStatus: (id, newStatus) => {
-                let rs = PaymentRequestController.getRequests(); rs = rs.map(req => req.id === id ? { ...req, status: newStatus } : req);
-                PaymentRequestController.saveRequests(rs); Utils.showMessage('Status Updated', `Request status: ${newStatus}.`); PaymentRequestController.updatePaymentSummary();
+                let requests = PaymentRequestController.getRequests();
+                const requestIndex = requests.findIndex(req => req.id === id);
+
+                if (requestIndex === -1) {
+                    Utils.showMessage('Error', 'Payment request not found.');
+                    return;
+                }
+
+                const oldStatus = requests[requestIndex].status;
+                requests[requestIndex].status = newStatus;
+                PaymentRequestController.saveRequests(requests);
+
+                if (newStatus === 'Approved' && oldStatus !== 'Approved') {
+                    const approvedRequest = requests[requestIndex];
+                    const amountToDeduct = parseFloat(approvedRequest.amount);
+                    const reason = `Approved Payment: ${approvedRequest.description.substring(0,25)} (ID: ${approvedRequest.id.slice(-6).toUpperCase()})`;
+
+                    const adjustmentHistory = BalanceTrackingController.getAdjustmentHistory();
+                    const newAdjustment = {
+                        id: Utils.generateId(),
+                        date: Utils.getTodayDateString(),
+                        amount: -amountToDeduct, 
+                        reason: reason,
+                        type: 'Debit (Payment Appr.)' 
+                    };
+                    adjustmentHistory.unshift(newAdjustment);
+                    BalanceTrackingController.saveAdjustmentHistory(adjustmentHistory);
+                    BalanceTrackingController.updateOverallBalanceDisplay(); 
+
+                    Utils.showMessage('Status & Balance Updated', `Request status: ${newStatus}. ${Utils.formatCurrency(amountToDeduct)} deducted from balance.`);
+                    
+                    if (AppState.currentPage === 'balanceTracking') {
+                        BalanceTrackingController.loadAdjustmentHistory();
+                    }
+                } else {
+                     Utils.showMessage('Status Updated', `Request status: ${newStatus}.`);
+                }
+                PaymentRequestController.updatePaymentSummary(); 
             },
             deleteRequest: (id) => {
                 Utils.showConfirmationModal('Delete Request', 'Are you sure you want to delete this payment request?', () => {
@@ -1230,24 +1249,24 @@
             updatePaymentSummary: () => {
                 const rs = PaymentRequestController.getRequests(), cm = Utils.getCurrentMonthYearString();
                 document.getElementById('paymentSummaryMonth').textContent = Utils.formatMonthForDisplay(cm);
-                let tr=0, ta=0, tp=0; rs.filter(req => req.requestDate.startsWith(cm)).forEach(req => { tr+=req.amount; if(req.status==='Approved'||req.status==='Paid')ta+=req.amount; if(req.status==='Paid')tp+=req.amount; });
+                let tr=0, ta=0, tp=0; rs.filter(req => req.requestDate.startsWith(cm)).forEach(req => { tr+=parseFloat(req.amount); if(req.status==='Approved'||req.status==='Paid')ta+=parseFloat(req.amount); if(req.status==='Paid')tp+=parseFloat(req.amount); });
                 const ua = ta - tp;
                 document.getElementById('totalRequestedAmount').textContent=Utils.formatCurrency(tr); document.getElementById('totalApprovedAmount').textContent=Utils.formatCurrency(ta);
                 document.getElementById('totalPaidAmount').textContent=Utils.formatCurrency(tp); document.getElementById('totalUnpaidApprovedAmount').textContent=Utils.formatCurrency(ua);
             },
             carryOverUnpaidApproved: () => {
-                const rs = PaymentRequestController.getRequests(), cm = Utils.getCurrentMonthYearString(); let uaa = 0;
-                rs.filter(req => req.requestDate.startsWith(cm) && req.status === 'Approved').forEach(req => uaa += req.amount);
-                rs.filter(req => req.requestDate.startsWith(cm) && req.status === 'Paid').forEach(req => uaa -= req.amount); // Subtract paid from approved
-                uaa = Math.max(0, uaa);
-                if (uaa <= 0) { Utils.showMessage('No Amount', 'No unpaid approved amounts to carry over.'); return; }
-                Utils.showConfirmationModal('Carry Over Balance', `Carry over ${Utils.formatCurrency(uaa)} (unpaid approved from ${Utils.formatMonthForDisplay(cm)}) to balance adjustments?`, () => {
-                    const rsn = `Carried over unpaid approved requests from ${Utils.formatMonthForDisplay(cm)}`;
-                    const amtIn = document.getElementById('manualCommissionAmount'), rsnIn = document.getElementById('manualCommissionReason');
-                    const origAmt = amtIn.value, origRsn = rsnIn.value; // Backup existing form values
-                    amtIn.value = uaa; rsnIn.value = rsn; BalanceTrackingController.addManualBalanceAdjustment();
-                    amtIn.value = origAmt; rsnIn.value = origRsn; // Restore form values
-                    Utils.showMessage('Carried Over', `${Utils.formatCurrency(uaa)} added to balance adjustments.`);
+                const rs = PaymentRequestController.getRequests(), cm = Utils.getCurrentMonthYearString();
+                let unpaidApprovedForCarryOver = 0;
+                rs.filter(req => req.requestDate.startsWith(cm) && req.status === 'Approved').forEach(req => unpaidApprovedForCarryOver += parseFloat(req.amount));
+
+                if (unpaidApprovedForCarryOver <= 0) { Utils.showMessage('No Amount', 'No unpaid "Approved" amounts from current month to carry over.'); return; }
+                Utils.showConfirmationModal('Carry Over Balance', `Carry over ${Utils.formatCurrency(unpaidApprovedForCarryOver)} (unpaid "Approved" from ${Utils.formatMonthForDisplay(cm)}) to balance adjustments as a negative (debit) entry? This will reflect as an expense covered.`, () => {
+                    const rsn = `Carried over unpaid approved from ${Utils.formatMonthForDisplay(cm)}`;
+                    const adjAmt = -unpaidApprovedForCarryOver; 
+                    const adj = { id: Utils.generateId(), date: Utils.getTodayDateString(), amount: adjAmt, reason: rsn, type: 'Debit (Carry Over)' };
+                    const hist = BalanceTrackingController.getAdjustmentHistory(); hist.unshift(adj); BalanceTrackingController.saveAdjustmentHistory(hist);
+                    BalanceTrackingController.updateOverallBalanceDisplay(); BalanceTrackingController.loadAdjustmentHistory();
+                    Utils.showMessage('Carried Over', `${Utils.formatCurrency(unpaidApprovedForCarryOver)} adjusted in balance.`);
                 });
             }
         };
@@ -1291,70 +1310,170 @@
         };
 
         const BranchBudgetController = {
-            STORAGE_KEY: 'branchBudgetEntries', tempBillImageBase64: null,
+            STORAGE_KEY: 'branchBudgetEntries', 
+            tempBillImagesBase64: [], // Changed to array
+            currentEditingBillIndex: null, // To track which bill is being printed from modal
+
             getEntries: () => StorageService.getItem(BranchBudgetController.STORAGE_KEY) || [],
             saveEntries: (e) => StorageService.setItem(BranchBudgetController.STORAGE_KEY, e),
 
-            previewBillImage: (ev) => {
-                const f = ev.target.files[0], p = document.getElementById('billImagePreview');
-                if (f) { const rdr = new FileReader(); rdr.onload = (e) => { p.src = e.target.result; p.classList.remove('hidden'); BranchBudgetController.tempBillImageBase64 = e.target.result; }; rdr.readAsDataURL(f); }
-                else { p.classList.add('hidden'); p.src = "#"; BranchBudgetController.tempBillImageBase64 = null; }
+            previewBillImages: (ev) => { // Renamed and modified for multiple files
+                BranchBudgetController.tempBillImagesBase64 = [];
+                const previewsContainer = document.getElementById('billImagePreviewsContainer');
+                previewsContainer.innerHTML = ''; // Clear existing previews
+                const files = ev.target.files;
+
+                if (files.length > 0) {
+                    previewsContainer.classList.remove('hidden');
+                    Array.from(files).forEach((file, index) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            BranchBudgetController.tempBillImagesBase64.push(e.target.result);
+                            const imgWrapper = document.createElement('div');
+                            imgWrapper.classList.add('relative', 'inline-block');
+                            const img = document.createElement('img');
+                            img.src = e.target.result;
+                            img.alt = `Preview ${index + 1}`;
+                            img.classList.add('max-h-32', 'max-w-xs', 'rounded', 'border', 'p-1', 'object-contain');
+                            imgWrapper.appendChild(img);
+                            previewsContainer.appendChild(imgWrapper);
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                } else {
+                    previewsContainer.classList.add('hidden');
+                }
             },
+
             handleAddEntry: (e) => {
-                e.preventDefault(); const dt = document.getElementById('budgetEntryDate').value, itm = document.getElementById('budgetItem').value.trim(), amt = parseFloat(document.getElementById('budgetAmount').value);
+                e.preventDefault(); 
+                const dt = document.getElementById('budgetEntryDate').value, 
+                      itm = document.getElementById('budgetItem').value.trim(), 
+                      amt = parseFloat(document.getElementById('budgetAmount').value);
+
                 if (!dt||!itm||isNaN(amt)||amt<=0) { Utils.showMessage('Validation Error', 'Fill Date, Item, and Amount.'); return; }
-                const ne = {id:Utils.generateId(),date:dt,item:itm,amount:amt,billImageBase64:BranchBudgetController.tempBillImageBase64,entryDate:Utils.getTodayDateString()};
-                const es = BranchBudgetController.getEntries(); es.unshift(ne); BranchBudgetController.saveEntries(es); BranchBudgetController.loadEntries();
-                document.getElementById('branchBudgetForm').reset(); document.getElementById('billImagePreview').classList.add('hidden'); BranchBudgetController.tempBillImageBase64 = null;
+                
+                const ne = {
+                    id:Utils.generateId(),
+                    date:dt,
+                    item:itm,
+                    amount:amt,
+                    billImagesBase64: BranchBudgetController.tempBillImagesBase64, // Save array of images
+                    entryDate:Utils.getTodayDateString()
+                };
+                const es = BranchBudgetController.getEntries(); 
+                es.unshift(ne); 
+                BranchBudgetController.saveEntries(es); 
+                BranchBudgetController.loadEntries();
+                
+                document.getElementById('branchBudgetForm').reset(); 
+                document.getElementById('billImagePreviewsContainer').innerHTML = ''; 
+                document.getElementById('billImagePreviewsContainer').classList.add('hidden');
+                BranchBudgetController.tempBillImagesBase64 = []; // Reset temp images
                 Utils.showMessage('Success', 'Budget entry added.');
             },
+
             loadEntries: () => {
-                const es = BranchBudgetController.getEntries(), tbody = document.getElementById('branchBudgetTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
+                const es = BranchBudgetController.getEntries(), tbody = document.getElementById('branchBudgetTable').getElementsByTagName('tbody')[0]; 
+                tbody.innerHTML = '';
                 if (es.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-3">No budget entries.</td></tr>'; return; }
+                
                 es.forEach(en => {
-                    const r = tbody.insertRow(); r.insertCell().textContent = en.id.slice(-6).toUpperCase(); r.insertCell().textContent = Utils.formatDateForDisplay(en.date);
-                    r.insertCell().textContent = en.item; r.insertCell().textContent = Utils.formatCurrency(en.amount);
+                    const r = tbody.insertRow(); 
+                    r.insertCell().textContent = en.id.slice(-6).toUpperCase(); 
+                    r.insertCell().textContent = Utils.formatDateForDisplay(en.date);
+                    r.insertCell().textContent = en.item; 
+                    r.insertCell().textContent = Utils.formatCurrency(en.amount);
+                    
                     const bc = r.insertCell(); 
-                    if (en.billImageBase64) { 
+                    if (en.billImagesBase64 && en.billImagesBase64.length > 0) { 
                         const viewBtn = document.createElement('button');
-                        viewBtn.textContent = 'View Bill';
+                        viewBtn.textContent = `View Bill(s) (${en.billImagesBase64.length})`;
                         viewBtn.classList.add('text-blue-600', 'hover:underline', 'text-sm', 'p-0', 'bg-transparent', 'border-none', 'cursor-pointer');
-                        viewBtn.onclick = () => BranchBudgetController.showBillPreviewModal(en.billImageBase64, en.item);
+                        viewBtn.onclick = () => BranchBudgetController.showBillPreviewModal(en.billImagesBase64, en.item);
                         bc.appendChild(viewBtn);
                     } else { 
-                        bc.textContent='No Bill'; 
+                        bc.textContent='No Bill(s)'; 
                     }
-                    const ac = r.insertCell(); ac.classList.add('action-column'); const delBtn = document.createElement('button'); delBtn.innerHTML='<i class="fas fa-trash-alt"></i>'; delBtn.classList.add('btn','btn-danger','btn-icon','text-xs');
-                    delBtn.onclick=()=>BranchBudgetController.deleteEntry(en.id); ac.appendChild(delBtn);
+                    
+                    const ac = r.insertCell(); 
+                    ac.classList.add('action-column'); 
+                    const delBtn = document.createElement('button'); 
+                    delBtn.innerHTML='<i class="fas fa-trash-alt"></i>'; 
+                    delBtn.classList.add('btn','btn-danger','btn-icon','text-xs');
+                    delBtn.onclick=()=>BranchBudgetController.deleteEntry(en.id); 
+                    ac.appendChild(delBtn);
                 });
             },
+
             deleteEntry: (id) => {
                 Utils.showConfirmationModal('Delete Budget Entry', 'Are you sure you want to delete this budget entry?', () => {
-                    let es = BranchBudgetController.getEntries(); es = es.filter(e => e.id !== id); BranchBudgetController.saveEntries(es);
-                    BranchBudgetController.loadEntries(); Utils.showMessage('Deleted', 'Budget entry deleted.');
+                    let es = BranchBudgetController.getEntries(); 
+                    es = es.filter(e => e.id !== id); 
+                    BranchBudgetController.saveEntries(es);
+                    BranchBudgetController.loadEntries(); 
+                    Utils.showMessage('Deleted', 'Budget entry deleted.');
                 });
             },
-            showBillPreviewModal: (imageBase64, itemName) => {
+
+            showBillPreviewModal: (imagesBase64Array, itemName) => {
                 document.getElementById('billPreviewModalTitle').textContent = `Bill Preview: ${itemName || 'Bill'}`;
-                const imgElement = document.getElementById('billPreviewImageElement');
-                imgElement.src = imageBase64;
-                
-                document.getElementById('printBillFromModalBtn').dataset.billImage = imageBase64;
+                const modalImagesContainer = document.getElementById('billPreviewImagesContainer');
+                modalImagesContainer.innerHTML = ''; // Clear previous images
+                BranchBudgetController.currentEditingBillIndex = null; // Reset
+
+                const printBillBtnModal = document.getElementById('printBillFromModalBtn');
+
+                if (imagesBase64Array && imagesBase64Array.length > 0) {
+                    imagesBase64Array.forEach((base64, index) => {
+                        const img = document.createElement('img');
+                        img.src = base64;
+                        img.alt = `Bill ${index + 1}`;
+                        img.classList.add('max-w-full', 'max-h-[60vh]', 'object-contain', 'mb-2', 'border', 'rounded');
+                        img.dataset.billIndex = index; // Store index for printing
+                        modalImagesContainer.appendChild(img);
+                    });
+                    // If only one image, enable print button for it directly.
+                    if (imagesBase64Array.length === 1) {
+                        printBillBtnModal.classList.remove('hidden');
+                        printBillBtnModal.dataset.billImage = imagesBase64Array[0]; 
+                    } else {
+                        // If multiple images, hide the generic print button for now or adapt it later
+                        // For now, let's hide it to simplify. User can print from browser's right-click context menu on image.
+                        printBillBtnModal.classList.add('hidden');
+                        delete printBillBtnModal.dataset.billImage;
+                    }
+                } else {
+                     modalImagesContainer.textContent = "No bills to display.";
+                     printBillBtnModal.classList.add('hidden');
+                     delete printBillBtnModal.dataset.billImage;
+                }
                 document.getElementById('billPreviewModal').classList.remove('hidden');
             },
+
             hideBillPreviewModal: () => {
                 document.getElementById('billPreviewModal').classList.add('hidden');
-                document.getElementById('billPreviewImageElement').src = "#"; 
-                delete document.getElementById('printBillFromModalBtn').dataset.billImage; 
+                document.getElementById('billPreviewImagesContainer').innerHTML = ""; 
+                BranchBudgetController.currentEditingBillIndex = null;
+                // Ensure print button state is reset
+                const printBillBtnModal = document.getElementById('printBillFromModalBtn');
+                printBillBtnModal.classList.add('hidden');
+                delete printBillBtnModal.dataset.billImage;
             },
-            printSpecificBill: () => {
+            
+            // This function now specifically refers to the button in the modal
+            printSpecificBillFromModal: () => {
                 const imageBase64 = document.getElementById('printBillFromModalBtn').dataset.billImage;
-                if (!imageBase64) { Utils.showMessage('Error', 'No bill image data found to print.'); return; }
+                if (!imageBase64) { 
+                    Utils.showMessage('Error', 'No specific bill selected or available to print from modal.'); 
+                    return; 
+                }
+                
                 const printWindow = window.open('', '_blank', 'height=700,width=900'); 
                 printWindow.document.write('<html><head><title>Print Bill</title>');
-                printWindow.document.write('<style> body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; } img { max-width: 100%; max-height: 95vh; object-fit: contain; } @page { size: auto; margin: 20mm; } </style>');
+                printWindow.document.write('<style> body { margin: 20mm; display: flex; justify-content: center; align-items: flex-start; } img { max-width: 100%; height: auto; object-fit: contain; } @page { size: A4; margin: 20mm; } </style>');
                 printWindow.document.write('</head><body>');
-                printWindow.document.write('<img src="' + imageBase64 + '" onload="window.focus(); window.print(); setTimeout(function(){ printWindow.close(); }, 500);">');
+                printWindow.document.write('<img src="' + imageBase64 + '" onload="window.focus(); setTimeout(function() { window.print(); setTimeout(function(){ printWindow.close(); }, 200); }, 200);">');
                 printWindow.document.write('</body></html>');
                 printWindow.document.close(); 
             }
