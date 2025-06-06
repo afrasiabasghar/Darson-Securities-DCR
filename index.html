@@ -118,6 +118,10 @@
         .btn-icon {
             padding: 0.5rem;
         }
+        .bill-preview-img.selected {
+            border: 3px solid #2a5282; /* Darson Blue */
+            box-shadow: 0 0 10px rgba(42, 82, 130, 0.5);
+        }
 
         /* Table styling */
         table {
@@ -627,9 +631,10 @@
             <div id="billPreviewModal" class="modal hidden">
                 <div class="modal-content modal-lg"> 
                     <h3 id="billPreviewModalTitle" class="modal-title">Bill Preview</h3>
-                    <div id="billPreviewImagesContainer" class="my-4 flex flex-col items-center gap-4 max-h-[70vh] overflow-y-auto bg-gray-100 p-2 rounded"></div>
+                     <p class="text-sm text-gray-500 mb-4">Click on a bill to select it for printing.</p>
+                    <div id="billPreviewImagesContainer" class="my-4 flex flex-wrap justify-center gap-4 max-h-[60vh] overflow-y-auto bg-gray-100 p-2 rounded"></div>
                     <div class="mt-6 flex justify-end space-x-3">
-                        <button id="printBillFromModalBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Current Bill</button>
+                        <button id="printBillFromModalBtn" class="btn btn-secondary" disabled><i class="fas fa-print mr-2"></i>Print Selected Bill</button>
                         <button id="closeBillPreviewModalBtn" class="btn btn-primary">Close</button>
                     </div>
                 </div>
@@ -1173,9 +1178,32 @@
                 }
                 else if (type === 'daily_historical') { const d = document.getElementById('reportDate').value, data = AppState.dailyDataCache[d]; if (!data) { Utils.showMessage('Error', 'View daily report first.'); return; } rTitle = 'Daily Commission Report'; rDateStr = Utils.formatDateForDisplay(data.date); content = `<div class="page-container">${document.getElementById('dailyReportDisplay').innerHTML}</div>`; }
                 else if (type === 'monthly') { const m = document.getElementById('reportMonth').value, data = AppState.monthlyDataCache[m]; if (!data) { Utils.showMessage('Error', 'View monthly report first.'); return; } rTitle = 'Monthly Commission Report'; rDateStr = Utils.formatMonthForDisplay(data.month); content = `<div class="page-container">${document.getElementById('monthlyReportDisplay').innerHTML}</div>`; }
-                else if (type === 'paymentRequests') { rTitle = 'Payment Requests Report'; content = `<div class="page-container"><h3>${document.getElementById('paymentRequestsSummary').innerHTML.replace(/<button.*?<\/button>/gi, '')}</h3>${document.getElementById('paymentRequestsTable').outerHTML}</div>`; }
-                else if (type === 'courierTracking') { rTitle = 'Courier Tracking Report'; content = `<div class="page-container">${document.getElementById('courierTrackingTable').outerHTML}</div>`; }
-                else if (type === 'branchBudget') { rTitle = 'Branch Budget Report'; let tbl = '<table>' + document.getElementById('branchBudgetTable').innerHTML + '</table>'; tbl = tbl.replace(/<th class="action-column">Actions<\/th>/gi, '').replace(/<td class="action-column">.*?<\/td>/gi, ''); content = `<div class="page-container">${tbl}</div>`; }
+                else if (type === 'paymentRequests') {
+                    rTitle = 'Payment Requests Report';
+                    const tableClone = document.getElementById('paymentRequestsTable').cloneNode(true);
+                    tableClone.querySelectorAll('tbody tr').forEach(row => {
+                        const statusCell = row.cells[4];
+                        const select = statusCell.querySelector('select');
+                        if (select) statusCell.textContent = select.value;
+                    });
+                    content = `<div class="page-container"><h3>${document.getElementById('paymentRequestsSummary').innerHTML.replace(/<button.*?<\/button>/gi, '')}</h3>${tableClone.outerHTML}</div>`;
+                }
+                else if (type === 'courierTracking') {
+                    rTitle = 'Courier Tracking Report';
+                    const tableClone = document.getElementById('courierTrackingTable').cloneNode(true);
+                    tableClone.querySelectorAll('tbody tr').forEach(row => {
+                        const statusCell = row.cells[8];
+                        const input = statusCell.querySelector('input');
+                        if (input) statusCell.textContent = input.value;
+                    });
+                    content = `<div class="page-container">${tableClone.outerHTML}</div>`;
+                }
+                else if (type === 'branchBudget') {
+                    rTitle = 'Branch Budget Report';
+                    let tbl = document.getElementById('branchBudgetTable').cloneNode(true);
+                    tbl.querySelectorAll('.action-column, .bill-view-column').forEach(el => el.remove());
+                    content = `<div class="page-container">${tbl.outerHTML}</div>`;
+                }
                 else { Utils.showMessage('Error', 'Unknown report type.'); return; }
                 
                 titleEl.textContent = rTitle; dateEl.textContent = rDateStr; 
@@ -1214,7 +1242,7 @@
             requestAuthThenDelete: (itemType, itemId) => {
                 UIController.showAuthModal(() => {
                     if (itemType === 'dailyReport') { StorageService.removeItem(`transactions_${itemId}`); delete AppState.dailyDataCache[itemId]; document.getElementById('dailyReportDisplay').innerHTML = `<p class="text-green-500">Report for ${Utils.formatDateForDisplay(itemId)} deleted.</p>`; Utils.showMessage('Success', `Daily report for ${Utils.formatDateForDisplay(itemId)} deleted.`); }
-                    else if (itemType === 'monthlyReport') { const keys = StorageService.getAllKeysWithSubPrefix('transactions_'); let c = 0; keys.forEach(k => { if (k.startsWith(`${StorageService.prefix}transactions_${itemId}`)) { StorageService.removeItem(k.replace(StorageService.prefix, '')); c++; } }); delete AppState.monthlyDataCache[itemId]; document.getElementById('monthlyReportDisplay').innerHTML = `<p class="text-green-500">Data for ${Utils.formatMonthForDisplay(itemId)} (${c} days) deleted.</p>`; Utils.showMessage('Success', `Data for ${Utils.formatMonthForDisplay(itemId)} deleted.`); }
+                    else if (itemType === 'monthlyReport') { const keys = StorageService.getAllKeysWithPrefix('transactions_'); let c = 0; keys.forEach(k => { if (k.startsWith(`${StorageService.prefix}transactions_${itemId}`)) { StorageService.removeItem(k.replace(StorageService.prefix, '')); c++; } }); delete AppState.monthlyDataCache[itemId]; document.getElementById('monthlyReportDisplay').innerHTML = `<p class="text-green-500">Data for ${Utils.formatMonthForDisplay(itemId)} (${c} days) deleted.</p>`; Utils.showMessage('Success', `Data for ${Utils.formatMonthForDisplay(itemId)} deleted.`); }
                     else if (itemType === 'employee') {
                         EmployeeController.deleteEmployee(itemId);
                     }
@@ -1459,7 +1487,6 @@
         const BranchBudgetController = {
             STORAGE_KEY: 'branchBudgetEntries', 
             tempBillImagesBase64: [], 
-            currentEditingBillIndex: null,
 
             getEntries: () => StorageService.getItem(BranchBudgetController.STORAGE_KEY) || [],
             saveEntries: (e) => StorageService.setItem(BranchBudgetController.STORAGE_KEY, e),
@@ -1501,7 +1528,7 @@
                 es.forEach(en => {
                     const r = tbody.insertRow(); r.insertCell().textContent = en.id.slice(-6).toUpperCase(); r.insertCell().textContent = Utils.formatDateForDisplay(en.date);
                     r.insertCell().textContent = en.item; r.insertCell().textContent = Utils.formatCurrency(en.amount);
-                    const bc = r.insertCell(); 
+                    const bc = r.insertCell(); bc.classList.add('bill-view-column');
                     if (en.billImagesBase64 && en.billImagesBase64.length > 0) { 
                         const viewBtn = document.createElement('button'); viewBtn.textContent = `View Bill(s) (${en.billImagesBase64.length})`;
                         viewBtn.classList.add('text-blue-600', 'hover:underline', 'text-sm', 'p-0', 'bg-transparent', 'border-none', 'cursor-pointer');
@@ -1522,36 +1549,50 @@
 
             showBillPreviewModal: (imagesBase64Array, itemName) => {
                 document.getElementById('billPreviewModalTitle').textContent = `Bill Preview: ${itemName || 'Bill'}`;
-                const modalImagesContainer = document.getElementById('billPreviewImagesContainer'); modalImagesContainer.innerHTML = '';
-                BranchBudgetController.currentEditingBillIndex = null;
+                const modalImagesContainer = document.getElementById('billPreviewImagesContainer');
+                modalImagesContainer.innerHTML = '';
                 const printBillBtnModal = document.getElementById('printBillFromModalBtn');
+                
                 if (imagesBase64Array && imagesBase64Array.length > 0) {
-                    imagesBase64Array.forEach((base64, index) => {
-                        const img = document.createElement('img'); img.src = base64; img.alt = `Bill ${index + 1}`;
-                        img.classList.add('max-w-full', 'max-h-[60vh]', 'object-contain', 'mb-2', 'border', 'rounded');
-                        img.dataset.billIndex = index; modalImagesContainer.appendChild(img);
+                    imagesBase64Array.forEach((base64) => {
+                        const img = document.createElement('img');
+                        img.src = base64;
+                        img.classList.add('bill-preview-img', 'max-w-full', 'max-h-[55vh]', 'object-contain', 'mb-2', 'border', 'rounded', 'cursor-pointer', 'p-1');
+                        img.onclick = () => {
+                            // Clear previous selection
+                            modalImagesContainer.querySelectorAll('img').forEach(i => i.classList.remove('selected'));
+                            // Select current image
+                            img.classList.add('selected');
+                            printBillBtnModal.dataset.billImage = base64;
+                            printBillBtnModal.disabled = false;
+                        };
+                        modalImagesContainer.appendChild(img);
                     });
-                    if (imagesBase64Array.length === 1) {
-                        printBillBtnModal.classList.remove('hidden'); printBillBtnModal.dataset.billImage = imagesBase64Array[0]; 
-                    } else { printBillBtnModal.classList.add('hidden'); delete printBillBtnModal.dataset.billImage; }
-                } else { modalImagesContainer.textContent = "No bills to display."; printBillBtnModal.classList.add('hidden'); delete printBillBtnModal.dataset.billImage; }
+                } else {
+                     modalImagesContainer.textContent = "No bills to display.";
+                }
+                BranchBudgetController.hideBillPreviewModal(true); // Reset button state
                 document.getElementById('billPreviewModal').classList.remove('hidden');
             },
 
-            hideBillPreviewModal: () => {
-                document.getElementById('billPreviewModal').classList.add('hidden');
-                document.getElementById('billPreviewImagesContainer').innerHTML = ""; BranchBudgetController.currentEditingBillIndex = null;
-                const printBillBtnModal = document.getElementById('printBillFromModalBtn'); printBillBtnModal.classList.add('hidden'); delete printBillBtnModal.dataset.billImage;
+            hideBillPreviewModal: (isOpening = false) => {
+                const printBillBtnModal = document.getElementById('printBillFromModalBtn');
+                printBillBtnModal.disabled = true;
+                delete printBillBtnModal.dataset.billImage;
+                if (!isOpening) {
+                    document.getElementById('billPreviewModal').classList.add('hidden');
+                    document.getElementById('billPreviewImagesContainer').innerHTML = ""; 
+                }
             },
             
             printSpecificBillFromModal: () => {
                 const imageBase64 = document.getElementById('printBillFromModalBtn').dataset.billImage;
-                if (!imageBase64) { Utils.showMessage('Error', 'No specific bill selected or available to print from modal.'); return; }
+                if (!imageBase64) { Utils.showMessage('Error', 'Please select a bill to print.'); return; }
                 const printWindow = window.open('', '_blank', 'height=700,width=900'); 
                 printWindow.document.write('<html><head><title>Print Bill</title>');
-                printWindow.document.write('<style> body { margin: 20mm; display: flex; justify-content: center; align-items: flex-start; } img { max-width: 100%; height: auto; object-fit: contain; } @page { size: A4; margin: 20mm; } </style>');
+                printWindow.document.write('<style> body { margin: 20mm; } img { max-width: 100%; height: auto; } @page { size: A4; margin: 20mm; } </style>');
                 printWindow.document.write('</head><body>');
-                printWindow.document.write('<img src="' + imageBase64 + '" onload="window.focus(); setTimeout(function() { window.print(); setTimeout(function(){ printWindow.close(); }, 200); }, 200);\">');
+                printWindow.document.write(`<img src="${imageBase64}" onload="window.focus(); setTimeout(() => { window.print(); setTimeout(() => printWindow.close(), 200); }, 200);">`);
                 printWindow.document.write('</body></html>');
                 printWindow.document.close(); 
             }
