@@ -64,14 +64,14 @@
         }
 
         /* Form elements styling */
-        input[type="text"], input[type="number"], input[type="date"], input[type="password"], select, textarea {
+        input[type="text"], input[type="number"], input[type="date"], input[type="password"], input[type="month"], select, textarea {
             border: 1px solid #cbd5e1; /* cool-gray-300 */
             padding: 0.5rem 0.75rem;
             border-radius: 0.375rem; /* md */
             transition: border-color 0.3s ease, box-shadow 0.3s ease;
             width: 100%;
         }
-        input[type="text"]:focus, input[type="number"]:focus, input[type="date"]:focus, input[type="password"]:focus, select:focus, textarea:focus {
+        input[type="text"]:focus, input[type="number"]:focus, input[type="date"]:focus, input[type="password"]:focus, input[type="month"]:focus, select:focus, textarea:focus {
             border-color: #2a5282; /* Darson blue */
             box-shadow: 0 0 0 3px rgba(42, 82, 130, 0.2); /* Darson blue focus ring */
             outline: none;
@@ -151,6 +151,8 @@
             align-items: center;
             z-index: 1000;
             overflow-y: auto; /* For long modals */
+            padding-top: 2rem;
+            padding-bottom: 2rem;
         }
         .modal-content {
             background-color: white;
@@ -160,8 +162,8 @@
             width: 90%;
             max-width: 500px; /* Default max-width */
         }
-        .modal-content.modal-lg { /* For larger modals like image preview */
-            max-width: 800px; 
+        .modal-content.modal-lg {
+            max-width: 800px;
         }
         .modal-title {
             font-size: 1.25rem; /* xl */
@@ -171,6 +173,7 @@
         }
 
         /* Print-specific styles */
+        .print-only { display: none; }
         @media print {
             body {
                 background-color: white;
@@ -179,7 +182,7 @@
                 margin: 0;
                 padding: 0;
             }
-            nav, .no-print, #sidebar {
+            nav, .no-print, #sidebar, .modal {
                 display: none !important;
             }
             .page-container {
@@ -195,22 +198,9 @@
                 text-align: center;
                 margin-bottom: 20px;
             }
-            .print-header h1 {
-                font-size: 18pt;
-                font-weight: bold;
-                margin: 0;
-                color: black !important;
-            }
-            .print-header h2 {
-                font-size: 14pt;
-                margin: 0;
-                color: black !important;
-            }
-            .print-header p {
-                font-size: 10pt;
-                margin: 5px 0;
-                color: black !important;
-            }
+            .print-header h1 { font-size: 18pt; font-weight: bold; margin: 0; color: black !important; }
+            .print-header h2 { font-size: 14pt; margin: 0; color: black !important; }
+            .print-header p { font-size: 10pt; margin: 5px 0; color: black !important; }
             .print-footer {
                 display: block !important;
                 text-align: center;
@@ -222,34 +212,20 @@
             }
             table {
                 font-size: 9pt;
-                border: 1px solid #ccc; /* Add borders for tables in print */
+                border: 1px solid #ccc !important; /* Add borders for tables in print */
             }
-            th, td {
-                border: 1px solid #ccc;
-                padding: 4px 6px;
-            }
-            th {
-                background-color: #eee !important; /* Light gray for table headers */
-                color: black !important;
-            }
-            a {
-                text-decoration: none;
-                color: black;
-            }
-            img {
-                max-width: 100% !important; /* Ensure images fit */
-                page-break-inside: avoid;
-            }
-            .page-break-before {
-                page-break-before: always;
-            }
-            .page-break-after {
-                page-break-after: always;
-            }
-            /* Optimize content per page */
-            @page {
-                size: A4;
-                margin: 0.75in;
+            th, td { border: 1px solid #ccc !important; padding: 4px 6px; }
+            th { background-color: #eee !important; color: black !important; }
+            a { text-decoration: none; color: black; }
+            img { max-width: 100% !important; page-break-inside: avoid; }
+            .page-break-before { page-break-before: always; }
+            .page-break-after { page-break-after: always; }
+            @page { size: A4; margin: 0.75in; }
+            
+            .print-only { display: block; } /* Show print-only content */
+            .printable-view {
+                 margin: 0;
+                 padding: 1in;
             }
         }
         .print-header, .print-footer {
@@ -268,6 +244,7 @@
                 </button>
                 <div id="navLinks" class="hidden md:flex md:items-center md:space-x-3 w-full md:w-auto mt-4 md:mt-0">
                     <a href="#" class="block md:inline-block px-3 py-2 active" data-page="dashboard"><i class="fas fa-tachometer-alt nav-icon"></i>Dashboard</a>
+                    <a href="#" class="block md:inline-block px-3 py-2" data-page="employees"><i class="fas fa-users nav-icon"></i>Employees</a>
                     <a href="#" class="block md:inline-block px-3 py-2" data-page="reports"><i class="fas fa-chart-line nav-icon"></i>Reports</a>
                     <a href="#" class="block md:inline-block px-3 py-2" data-page="balanceTracking"><i class="fas fa-balance-scale nav-icon"></i>Balance Tracking</a>
                     <a href="#" class="block md:inline-block px-3 py-2" data-page="paymentRequests"><i class="fas fa-file-invoice-dollar nav-icon"></i>Payment Requests</a>
@@ -289,7 +266,6 @@
             <!-- Dashboard Page -->
             <div id="dashboardPage" class="page-container">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Commission Calculator</h2>
-                
                 <div class="mb-6 p-4 border rounded-lg bg-indigo-50">
                     <h3 class="text-lg font-semibold mb-2 text-indigo-700">Select Date for Transactions</h3>
                     <div class="flex flex-col sm:flex-row gap-4 items-end">
@@ -300,7 +276,6 @@
                         <button id="loadDashboardDateBtn" class="btn btn-primary w-full sm:w-auto"><i class="fas fa-calendar-day mr-2"></i>Load/Refresh for Selected Date</button>
                     </div>
                 </div>
-
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     <div>
                         <label for="stockName" class="block text-sm font-medium text-gray-700">Stock Name</label>
@@ -328,7 +303,6 @@
                         <button id="addTransactionBtn" class="btn btn-primary w-full"><i class="fas fa-plus-circle mr-2"></i>Add Transaction to List</button>
                     </div>
                 </div>
-
                 <h3 class="text-xl font-semibold mb-4 mt-8">Transactions for <span id="currentDateDisplay"></span></h3>
                 <div class="overflow-x-auto mb-6">
                     <table id="dailyTransactionsTable" class="min-w-full bg-white">
@@ -342,9 +316,7 @@
                                 <th class="py-2 px-4 border-b">Action</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <!-- Rows will be added here by JavaScript -->
-                        </tbody>
+                        <tbody></tbody>
                     </table>
                 </div>
                 <div id="dailySummary" class="p-4 bg-gray-50 rounded-lg shadow">
@@ -357,6 +329,51 @@
                 <div class="mt-6 flex justify-end space-x-3">
                     <button id="saveDayTransactionsBtn" class="btn btn-primary"><i class="fas fa-save mr-2"></i>Save Transactions for Selected Date</button>
                     <button id="printDayTransactionsBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Report for Selected Date</button>
+                </div>
+            </div>
+
+            <!-- Employees Page -->
+            <div id="employeesPage" class="page-container hidden">
+                <h2 class="text-2xl font-semibold mb-6 page-title">Employee Management</h2>
+                <form id="employeeForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
+                    <h3 class="text-xl font-semibold mb-4">Add New Employee</h3>
+                    <input type="hidden" id="employeeId">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="employeeName" class="block text-sm font-medium">Full Name</label>
+                            <input type="text" id="employeeName" class="mt-1 w-full" required>
+                        </div>
+                        <div>
+                            <label for="employeeDesignation" class="block text-sm font-medium">Designation</label>
+                            <input type="text" id="employeeDesignation" class="mt-1 w-full" required>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="employeeAddress" class="block text-sm font-medium">Address</label>
+                            <input type="text" id="employeeAddress" class="mt-1 w-full" required>
+                        </div>
+                        <div>
+                            <label for="employeeCnic" class="block text-sm font-medium">CNIC</label>
+                            <input type="text" id="employeeCnic" class="mt-1 w-full" required>
+                        </div>
+                        <div>
+                            <label for="employeeJoiningDate" class="block text-sm font-medium">Joining Date</label>
+                            <input type="date" id="employeeJoiningDate" class="mt-1 w-full" required>
+                        </div>
+                        <div>
+                            <label for="employeePicture" class="block text-sm font-medium">Employee Picture</label>
+                            <input type="file" id="employeePicture" accept="image/*" class="mt-1 w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        </div>
+                        <div>
+                           <img id="employeePicturePreview" src="https://placehold.co/100x100/e2e8f0/e2e8f0?text=." alt="Picture Preview" class="mt-2 h-24 w-24 rounded-full object-cover border-2 border-gray-300">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-4"><i class="fas fa-save mr-2"></i>Save Employee</button>
+                    <button type="button" id="clearEmployeeFormBtn" class="btn btn-secondary mt-4 ml-2">Clear Form</button>
+                </form>
+
+                <h3 class="text-xl font-semibold mb-4">Saved Employees</h3>
+                <div id="employeeList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Employee cards will be populated here -->
                 </div>
             </div>
 
@@ -375,12 +392,8 @@
                         <button id="deleteDailyReportBtn" class="btn btn-danger w-full sm:w-auto"><i class="fas fa-trash-alt mr-2"></i>Delete Report</button>
                     </div>
                 </div>
-                <div id="dailyReportDisplay" class="mt-6 hidden">
-                    <!-- Daily report content will be injected here -->
-                </div>
-
+                <div id="dailyReportDisplay" class="mt-6 hidden"></div>
                 <div class="my-8 border-t pt-8"></div>
-
                 <div class="mb-6 p-4 border rounded-lg bg-gray-50">
                     <h3 class="text-xl font-semibold mb-3">View Monthly Report</h3>
                     <div class="flex flex-col sm:flex-row gap-4 items-end">
@@ -393,9 +406,7 @@
                          <button id="deleteMonthlyReportBtn" class="btn btn-danger w-full sm:w-auto"><i class="fas fa-trash-alt mr-2"></i>Delete Report</button>
                     </div>
                 </div>
-                <div id="monthlyReportDisplay" class="mt-6 hidden">
-                    <!-- Monthly report content will be injected here -->
-                </div>
+                <div id="monthlyReportDisplay" class="mt-6 hidden"></div>
             </div>
 
             <!-- Balance Tracking Page -->
@@ -426,37 +437,11 @@
                     <h3 class="text-xl font-semibold mb-4">Balance Adjustment History</h3>
                     <div class="overflow-x-auto">
                         <table id="balanceAdjustmentHistoryTable" class="min-w-full bg-white">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Reason</th>
-                                    <th>Amount</th>
-                                    <th>Type</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- History will be populated here -->
-                            </tbody>
+                            <thead><tr><th>Date</th><th>Reason</th><th>Amount</th><th>Type</th></tr></thead>
+                            <tbody></tbody>
                         </table>
                     </div>
                 </div>
-
-                <!-- Data Management Section -->
-                <div class="mt-8 p-6 bg-sky-50 rounded-lg shadow">
-                    <h3 class="text-xl font-semibold text-sky-700 mb-4"><i class="fas fa-database mr-2"></i>Data Management</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                        <div>
-                            <p class="text-sm text-gray-600 mb-2">Download all application data to a backup file. This file can be used to restore your data later.</p>
-                            <button id="downloadDataBtn" class="btn btn-secondary w-full"><i class="fas fa-download mr-2"></i>Download All Data</button>
-                        </div>
-                        <div>
-                            <p class="text-sm text-gray-600 mb-2">Restore application data from a previously downloaded backup file. <strong class="text-red-600">Warning: This will overwrite all current data in the application.</strong></p>
-                            <input type="file" id="restoreDataInput" accept=".json" class="mt-1 w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 mb-3">
-                            <button id="restoreDataBtn" class="btn btn-secondary w-full"><i class="fas fa-upload mr-2"></i>Restore Data from File</button>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="mt-12 p-6 bg-red-50 border border-red-300 rounded-lg shadow">
                     <h3 class="text-xl font-semibold text-red-700 mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>Danger Zone</h3>
                     <p class="text-sm text-gray-700 mb-4">Warning: Resetting the application will permanently erase ALL data, including transactions, reports, balances, and settings. This action cannot be undone.</p>
@@ -466,7 +451,7 @@
 
             <!-- Payment Requests Page -->
             <div id="paymentRequestsPage" class="page-container hidden">
-                <h2 class="text-2xl font-semibold mb-6 page-title">Payment Requests</h2>
+                 <h2 class="text-2xl font-semibold mb-6 page-title">Payment Requests</h2>
                 <form id="paymentRequestForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
                     <h3 class="text-xl font-semibold mb-4">Create New Payment Request</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -485,7 +470,6 @@
                     </div>
                     <button type="submit" class="btn btn-primary mt-4"><i class="fas fa-paper-plane mr-2"></i>Submit Request</button>
                 </form>
-
                 <div id="paymentRequestsSummary" class="mb-6 p-4 bg-indigo-50 rounded-lg shadow">
                     <h3 class="text-xl font-semibold text-indigo-700 mb-3">Current Month Summary (<span id="paymentSummaryMonth"></span>)</h3>
                     <p>Total Requested: <span id="totalRequestedAmount" class="font-bold">PKR 0.00</span></p>
@@ -494,42 +478,27 @@
                     <p>Unpaid Approved Amount: <span id="totalUnpaidApprovedAmount" class="font-bold">PKR 0.00</span></p>
                     <button id="carryOverPaymentBtn" class="btn btn-secondary mt-3 text-sm"><i class="fas fa-random mr-2"></i>Carry Over Unpaid Approved to Next Month Balance</button>
                 </div>
-
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-xl font-semibold">Payment Request History</h3>
                     <button id="printPaymentRequestsBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Requests</button>
                 </div>
                 <div class="overflow-x-auto">
                     <table id="paymentRequestsTable" class="min-w-full bg-white">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Request Date</th>
-                                <th>Amount</th>
-                                <th>Description</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Payment requests will be listed here -->
-                        </tbody>
+                        <thead><tr><th>ID</th><th>Request Date</th><th>Amount</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
                     </table>
                 </div>
             </div>
 
             <!-- Courier Tracking Page -->
             <div id="courierTrackingPage" class="page-container hidden">
-                <h2 class="text-2xl font-semibold mb-6 page-title">Courier Tracking</h2>
+                 <h2 class="text-2xl font-semibold mb-6 page-title">Courier Tracking</h2>
                 <form id="courierTrackingForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
                     <h3 class="text-xl font-semibold mb-4">Add New Courier Entry</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label for="courierType" class="block text-sm font-medium">Type</label>
-                            <select id="courierType" class="mt-1 w-full">
-                                <option value="outgoing">Outgoing</option>
-                                <option value="incoming">Incoming</option>
-                            </select>
+                            <select id="courierType" class="mt-1 w-full"><option value="outgoing">Outgoing</option><option value="incoming">Incoming</option></select>
                         </div>
                         <div>
                             <label for="courierDateSent" class="block text-sm font-medium">Date Sent/Received</label>
@@ -537,7 +506,7 @@
                         </div>
                         <div>
                             <label for="courierTrackingId" class="block text-sm font-medium">Tracking ID</label>
-                            <input type="text" id="courierTrackingId" class="mt-1 w-full"> <!-- Not always required e.g. local hand delivery -->
+                            <input type="text" id="courierTrackingId" class="mt-1 w-full">
                         </div>
                          <div>
                             <label for="courierSenderName" class="block text-sm font-medium">Sender Name</label>
@@ -562,30 +531,14 @@
                     </div>
                     <button type="submit" class="btn btn-primary mt-4"><i class="fas fa-plus-circle mr-2"></i>Add Courier Entry</button>
                 </form>
-
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-xl font-semibold">Courier Records</h3>
                     <button id="printCourierReportBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Courier Report</button>
                 </div>
                  <div class="overflow-x-auto">
                     <table id="courierTrackingTable" class="min-w-full bg-white">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Type</th>
-                                <th>Date</th>
-                                <th>Track ID</th>
-                                <th>Sender</th>
-                                <th>Receiver</th>
-                                <th>Dest./Origin</th>
-                                <th>Description</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Courier records will be listed here -->
-                        </tbody>
+                        <thead><tr><th>ID</th><th>Type</th><th>Date</th><th>Track ID</th><th>Sender</th><th>Receiver</th><th>Dest./Origin</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
                     </table>
                 </div>
             </div>
@@ -613,33 +566,19 @@
                             <input type="file" id="budgetBillImages" accept="image/*" multiple class="mt-1 w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                         </div>
                         <div class="md:col-span-2">
-                            <div id="billImagePreviewsContainer" class="hidden mt-2 flex flex-wrap gap-2 p-2 border rounded-md bg-gray-50 min-h-[50px]">
-                                <!-- Image previews will be shown here -->
-                            </div>
+                            <div id="billImagePreviewsContainer" class="hidden mt-2 flex flex-wrap gap-2 p-2 border rounded-md bg-gray-50 min-h-[50px]"></div>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary mt-4"><i class="fas fa-save mr-2"></i>Save Budget Entry</button>
                 </form>
-
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-xl font-semibold">Budget Entries</h3>
                     <button id="printBudgetReportBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Budget Report</button>
                 </div>
                 <div class="overflow-x-auto">
                     <table id="branchBudgetTable" class="min-w-full bg-white">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Date</th>
-                                <th>Item</th>
-                                <th>Amount</th>
-                                <th>Bill(s)</th>
-                                <th class="action-column">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Budget entries will be listed here -->
-                        </tbody>
+                        <thead><tr><th>ID</th><th>Date</th><th>Item</th><th>Amount</th><th>Bill(s)</th><th class="action-column">Actions</th></tr></thead>
+                        <tbody></tbody>
                     </table>
                 </div>
             </div>
@@ -649,14 +588,8 @@
                 <div class="modal-content">
                     <h3 class="modal-title">Authentication Required</h3>
                     <p class="text-sm text-gray-600 mb-4">Please enter credentials to proceed.</p>
-                    <div>
-                        <label for="username" class="block text-sm font-medium">Username</label>
-                        <input type="text" id="username" class="mt-1 w-full">
-                    </div>
-                    <div class="mt-4">
-                        <label for="password" class="block text-sm font-medium">Password</label>
-                        <input type="password" id="password" class="mt-1 w-full">
-                    </div>
+                    <div><label for="username" class="block text-sm font-medium">Username</label><input type="text" id="username" class="mt-1 w-full"></div>
+                    <div class="mt-4"><label for="password" class="block text-sm font-medium">Password</label><input type="password" id="password" class="mt-1 w-full"></div>
                     <p id="authError" class="text-red-500 text-sm mt-2 hidden"></p>
                     <div class="mt-6 flex justify-end space-x-3">
                         <button id="cancelAuthBtn" class="btn btn-secondary">Cancel</button>
@@ -665,14 +598,13 @@
                 </div>
             </div>
             
-            <!-- Generic Message Modal (can be used for info or simple confirmation) -->
+            <!-- Generic Message Modal -->
             <div id="messageModal" class="modal hidden">
                 <div class="modal-content">
                     <h3 id="messageModalTitle" class="modal-title">Notification</h3>
                     <p id="messageModalText" class="text-sm text-gray-700 my-4"></p>
                     <div id="messageModalButtons" class="mt-6 flex justify-end space-x-3">
                         <button id="messageModalOkBtn" class="btn btn-primary">OK</button>
-                        <!-- Optional Cancel button for confirmation -->
                         <button id="messageModalCancelBtn" class="btn btn-secondary hidden">Cancel</button>
                     </div>
                 </div>
@@ -682,12 +614,108 @@
             <div id="billPreviewModal" class="modal hidden">
                 <div class="modal-content modal-lg"> 
                     <h3 id="billPreviewModalTitle" class="modal-title">Bill Preview</h3>
-                    <div id="billPreviewImagesContainer" class="my-4 flex flex-col items-center gap-4 max-h-[70vh] overflow-y-auto bg-gray-100 p-2 rounded">
-                        <!-- Multiple bill images will be shown here -->
-                    </div>
+                    <div id="billPreviewImagesContainer" class="my-4 flex flex-col items-center gap-4 max-h-[70vh] overflow-y-auto bg-gray-100 p-2 rounded"></div>
                     <div class="mt-6 flex justify-end space-x-3">
                         <button id="printBillFromModalBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Current Bill</button>
                         <button id="closeBillPreviewModalBtn" class="btn btn-primary">Close</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Employee Detail Modal (FINAL) -->
+            <div id="employeeDetailModal" class="modal hidden">
+                <div class="modal-content modal-lg">
+                    <div class="flex justify-between items-start">
+                        <h3 id="employeeDetailModalTitle" class="modal-title">Employee Profile</h3>
+                        <div class="flex space-x-2 no-print">
+                           <button id="printProfileFromModalBtn" class="btn btn-secondary btn-sm"><i class="fas fa-print mr-1"></i> Print Profile</button>
+                           <button id="editEmployeeFromModalBtn" class="btn btn-secondary btn-sm"><i class="fas fa-edit mr-1"></i> Edit</button>
+                           <button id="deleteEmployeeFromModalBtn" class="btn btn-danger btn-sm"><i class="fas fa-trash-alt mr-1"></i> Delete</button>
+                        </div>
+                    </div>
+                    
+                    <div id="employeeProfileContent">
+                        <!-- Employee Info Section -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 border rounded-lg">
+                            <div class="flex flex-col items-center md:col-span-1">
+                                <img id="modalEmployeePicture" src="https://placehold.co/150x150/e2e8f0/e2e8f0?text=." alt="Employee Picture" class="w-32 h-32 rounded-full object-cover mb-4 border-4 border-gray-200">
+                            </div>
+                            <div class="md:col-span-2 space-y-2 text-sm">
+                                <h4 id="modalEmployeeName" class="text-xl font-bold text-gray-800"></h4>
+                                <p class="text-gray-600"><i class="fas fa-briefcase w-5 mr-2 text-gray-400"></i><span id="modalEmployeeDesignation"></span></p>
+                                <p class="text-gray-600"><i class="fas fa-map-marker-alt w-5 mr-2 text-gray-400"></i><span id="modalEmployeeAddress"></span></p>
+                                <p class="text-gray-600"><i class="fas fa-id-card w-5 mr-2 text-gray-400"></i><span id="modalEmployeeCnic"></span></p>
+                                <p class="text-gray-600"><i class="fas fa-calendar-alt w-5 mr-2 text-gray-400"></i>Joined on <span id="modalEmployeeJoiningDate"></span></p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                            <!-- Leave Management Section -->
+                            <div>
+                                 <h4 class="text-md font-semibold mb-2 pt-2">Leave Management</h4>
+                                 <form id="leaveForm" class="mb-4 p-3 border rounded-lg bg-gray-50 no-print">
+                                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                         <div>
+                                             <label for="leaveMonth" class="text-xs">Month</label>
+                                             <input type="month" id="leaveMonth" class="mt-1 w-full text-sm p-1" required>
+                                         </div>
+                                         <div>
+                                             <label for="leaveCount" class="text-xs">No. of Leaves</label>
+                                             <input type="number" id="leaveCount" min="0" class="mt-1 w-full text-sm p-1" required>
+                                         </div>
+                                         <div class="flex items-end">
+                                             <button type="submit" class="btn btn-primary w-full text-xs py-1.5"><i class="fas fa-plus mr-1"></i>Add</button>
+                                         </div>
+                                     </div>
+                                      <input type="hidden" id="leaveEmployeeId">
+                                 </form>
+                                 <div class="overflow-y-auto max-h-32">
+                                     <table id="leaveHistoryTable" class="min-w-full bg-white text-xs">
+                                         <thead><tr><th>Month</th><th>Leaves</th></tr></thead>
+                                         <tbody></tbody>
+                                     </table>
+                                 </div>
+                            </div>
+
+                            <!-- Salary History Section -->
+                            <div>
+                                <h4 class="text-md font-semibold mb-2 pt-2">Salary Management</h4>
+                                <form id="salaryForm" class="mb-4 p-3 border rounded-lg bg-gray-50 no-print">
+                                    <input type="hidden" id="salaryEmployeeId">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div class="sm:col-span-2">
+                                            <label for="salaryMonth" class="text-xs">Month</label>
+                                            <input type="month" id="salaryMonth" class="mt-1 w-full text-sm p-1" required>
+                                        </div>
+                                        <div>
+                                            <label for="salaryAmount" class="text-xs">Basic Salary</label>
+                                            <input type="number" id="salaryAmount" class="mt-1 w-full text-sm p-1" required min="0">
+                                        </div>
+                                         <div>
+                                            <label for="salaryAllowances" class="text-xs">Allowances</label>
+                                            <input type="number" id="salaryAllowances" class="mt-1 w-full text-sm p-1" value="0" min="0">
+                                        </div>
+                                         <div>
+                                            <label for="salaryIncentives" class="text-xs">Incentives</label>
+                                            <input type="number" id="salaryIncentives" class="mt-1 w-full text-sm p-1" value="0" min="0">
+                                        </div>
+                                        <div class="flex items-end">
+                                            <button type="submit" class="btn btn-primary w-full text-xs py-1.5"><i class="fas fa-plus mr-1"></i>Add Salary</button>
+                                        </div>
+                                    </div>
+                                </form>
+                                <div class="overflow-y-auto max-h-32">
+                                    <table id="salaryHistoryTable" class="min-w-full bg-white text-xs">
+                                        <thead><tr><th>Month</th><th>Total</th><th>Status</th><th class="no-print">Actions</th></tr></thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex justify-end space-x-3 no-print">
+                        <button id="closeEmployeeDetailModalBtn" class="btn btn-primary">Close</button>
                     </div>
                 </div>
             </div>
@@ -698,6 +726,79 @@
                 <p>Developed by Afrasiab Asghar. Visit www.nextgensites.org or Contact +923060406003</p>
             </div>
         </main>
+        
+        <!-- Print Views Container -->
+        <div>
+            <!-- Salary Slip Print View -->
+            <div id="salarySlipPrintView" class="print-only printable-view">
+                 <div class="p-8 border-2 border-black" style="font-family: Arial, sans-serif; ">
+                    <header class="text-center mb-8 pb-4 border-b-2 border-black">
+                        <h1 class="text-3xl font-bold text-black">Darson Securities Limited</h1>
+                        <p class="text-lg text-black">Sargodha Branch</p>
+                        <h2 class="text-2xl font-semibold mt-4 text-black">Salary Slip</h2>
+                    </header>
+                    <section class="mb-6 text-sm">
+                        <div class="grid grid-cols-2 gap-x-8">
+                            <div>
+                                <p><strong>Employee Name:</strong> <span id="slipEmployeeName"></span></p>
+                                <p><strong>Designation:</strong> <span id="slipEmployeeDesignation"></span></p>
+                                 <p><strong>Address:</strong> <span id="slipEmployeeAddress"></span></p>
+                            </div>
+                            <div>
+                                <p><strong>Salary Month:</strong> <span id="slipSalaryMonth"></span></p>
+                                <p><strong>Print Date:</strong> <span id="slipPrintDate"></span></p>
+                                 <p><strong>CNIC:</strong> <span id="slipEmployeeCnic"></span></p>
+                            </div>
+                        </div>
+                    </section>
+                    <table class="w-full border-collapse border border-black text-black">
+                        <thead>
+                            <tr class="bg-gray-200">
+                                <th class="border border-black p-2 text-left">Earnings</th>
+                                <th class="border border-black p-2 text-right">Amount (PKR)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="border border-black p-2">Basic Salary</td>
+                                <td class="border border-black p-2 text-right" id="slipBasicSalary"></td>
+                            </tr>
+                            <tr>
+                                <td class="border border-black p-2">Allowances</td>
+                                <td class="border border-black p-2 text-right" id="slipAllowances"></td>
+                            </tr>
+                             <tr>
+                                <td class="border border-black p-2">Incentives</td>
+                                <td class="border border-black p-2 text-right" id="slipIncentives"></td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="font-bold bg-gray-100">
+                                <td class="border border-black p-2 text-left">Net Salary Payable</td>
+                                <td class="border border-black p-2 text-right" id="slipNetSalary"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <div class="mt-16 flex justify-between items-end">
+                        <div class="text-center">
+                            <p class="border-t border-black pt-1 mt-8 w-48">Employee Signature</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="border-t border-black pt-1 mt-8 w-48">Accounts Department</p>
+                        </div>
+                    </div>
+                     <footer class="text-center text-xs text-gray-600 mt-12">
+                         This is a computer-generated slip and does not require a signature.
+                     </footer>
+                </div>
+            </div>
+            
+            <!-- Employee Profile Print View -->
+            <div id="employeeProfilePrintView" class="print-only printable-view">
+                 <!-- Content will be injected by JS -->
+            </div>
+        </div>
+
 
         <!-- Footer -->
         <footer class="bg-gray-800 text-white text-center p-4 no-print">
@@ -710,6 +811,7 @@
         // --- UTILITY FUNCTIONS ---
         const Utils = {
             formatDateForStorage: (date) => {
+                if (!date) return '';
                 const d = new Date(date);
                 const year = d.getFullYear();
                 const month = ('0' + (d.getMonth() + 1)).slice(-2);
@@ -718,14 +820,16 @@
             },
             formatDateForDisplay: (dateString) => {
                 if (!dateString) return '';
-                const [year, month, day] = dateString.split('-');
+                const date = new Date(dateString);
+                const day = ('0' + date.getUTCDate()).slice(-2);
+                const month = ('0' + (date.getUTCMonth() + 1)).slice(-2);
+                const year = date.getUTCFullYear();
                 return `${day}-${month}-${year}`;
             },
             formatMonthForDisplay: (monthString) => {
                 if (!monthString) return '';
                 const [year, month] = monthString.split('-');
-                const monthNames = ["January", "February", "March", "April", "May", "June",
-                                  "July", "August", "September", "October", "November", "December"];
+                const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
                 return `${monthNames[parseInt(month) - 1]} ${year}`;
             },
             formatCurrency: (amount) => `PKR ${parseFloat(amount).toFixed(2)}`,
@@ -771,23 +875,8 @@
 
         const StorageService = {
             prefix: 'darsonApp_',
-            getItem: (key) => { 
-                const item = localStorage.getItem(StorageService.prefix + key); 
-                try {
-                    return item ? JSON.parse(item) : null; 
-                } catch (e) {
-                    console.error(`Error parsing localStorage item ${key}:`, e, item);
-                    return null; // Return null if parsing fails
-                }
-            },
-            setItem: (key, value) => {
-                try {
-                    localStorage.setItem(StorageService.prefix + key, JSON.stringify(value));
-                } catch (e) {
-                    console.error(`Error stringifying or setting localStorage item ${key}:`, e, value);
-                    Utils.showMessage("Storage Error", "Could not save data. Local storage might be full or unavailable.");
-                }
-            },
+            getItem: (key) => { const item = localStorage.getItem(StorageService.prefix + key); return item ? JSON.parse(item) : null; },
+            setItem: (key, value) => localStorage.setItem(StorageService.prefix + key, JSON.stringify(value)),
             removeItem: (key) => localStorage.removeItem(StorageService.prefix + key),
             getAllKeysWithSubPrefix: (subPrefix) => {
                 const keys = [];
@@ -803,39 +892,6 @@
                     if (localStorage.key(i).startsWith(StorageService.prefix)) keysToRemove.push(localStorage.key(i));
                 }
                 keysToRemove.forEach(key => localStorage.removeItem(key));
-            },
-            // New methods for backup/restore
-            exportAllData: () => {
-                const allData = [];
-                for (let i = 0; i < localStorage.length; i++) {
-                    const prefixedKey = localStorage.key(i);
-                    if (prefixedKey.startsWith(StorageService.prefix)) {
-                        const unprefixedKey = prefixedKey.replace(StorageService.prefix, '');
-                        const value = StorageService.getItem(unprefixedKey); // getItem handles parsing
-                        if (value !== null) { 
-                            allData.push({ key: unprefixedKey, value: value });
-                        }
-                    }
-                }
-                return allData;
-            },
-            importAllData: (dataToRestore) => { 
-                try {
-                    StorageService.clearAllAppData(); 
-                    if (Array.isArray(dataToRestore)) {
-                        dataToRestore.forEach(item => {
-                            if (item && typeof item.key === 'string' && item.value !== undefined) {
-                                StorageService.setItem(item.key, item.value); // setItem handles stringify & prefix
-                            }
-                        });
-                        return true;
-                    }
-                    return false;
-                } catch (e) {
-                    console.error("Error during data import:", e);
-                    Utils.showMessage("Import Error", "Failed to import data. The file might be corrupted or incompatible.");
-                    return false;
-                }
             }
         };
         
@@ -872,7 +928,11 @@
                     link.addEventListener('click', (e) => {
                         e.preventDefault(); UIController.navigateTo(link.dataset.page);
                         document.querySelectorAll('nav a[data-page]').forEach(l => l.classList.remove('active'));
-                        link.classList.add('active'); document.getElementById('navLinks').classList.add('hidden');
+                        link.classList.add('active'); 
+                        const navLinks = document.getElementById('navLinks');
+                        if (!navLinks.classList.contains('hidden')) {
+                           navLinks.classList.add('hidden');
+                        }
                     });
                 });
                 document.getElementById('mobileMenuButton').addEventListener('click', () => document.getElementById('navLinks').classList.toggle('hidden'));
@@ -896,6 +956,11 @@
                 document.getElementById('saveDayTransactionsBtn').addEventListener('click', UIController.saveCurrentDayTransactions);
                 document.getElementById('printDayTransactionsBtn').addEventListener('click', () => UIController.printReport('daily_current'));
 
+                // Employees Page Listeners
+                document.getElementById('employeeForm').addEventListener('submit', EmployeeController.handleAddOrUpdateEmployee);
+                document.getElementById('employeePicture').addEventListener('change', EmployeeController.previewEmployeePicture);
+                document.getElementById('clearEmployeeFormBtn').addEventListener('click', EmployeeController.clearForm);
+
                 // Reports Page Listeners
                 document.getElementById('viewDailyReportBtn').addEventListener('click', UIController.displayDailyReport);
                 document.getElementById('printDailyReportBtn').addEventListener('click', () => UIController.printReport('daily_historical'));
@@ -914,10 +979,6 @@
                 document.getElementById('addManualCommissionBtn').addEventListener('click', BalanceTrackingController.addManualBalanceAdjustment);
                 document.getElementById('newMonthBtn').addEventListener('click', BalanceTrackingController.finalizeCurrentMonth);
                 document.getElementById('resetApplicationDataBtn').addEventListener('click', DataResetService.initiateFullResetProcess);
-                // New Data Management Listeners
-                document.getElementById('downloadDataBtn').addEventListener('click', DataBackupRestoreController.downloadData);
-                document.getElementById('restoreDataBtn').addEventListener('click', DataBackupRestoreController.initiateRestoreData);
-
 
                 // Payment Requests Listeners
                 document.getElementById('paymentRequestForm').addEventListener('submit', PaymentRequestController.handleAddRequest);
@@ -930,10 +991,19 @@
 
                 // Branch Budget Listeners
                 document.getElementById('branchBudgetForm').addEventListener('submit', BranchBudgetController.handleAddEntry);
-                document.getElementById('budgetBillImages').addEventListener('change', BranchBudgetController.previewBillImages); 
+                document.getElementById('budgetBillImages').addEventListener('change', BranchBudgetController.previewBillImages);
                 document.getElementById('printBudgetReportBtn').addEventListener('click', () => UIController.printReport('branchBudget'));
                 document.getElementById('closeBillPreviewModalBtn').addEventListener('click', BranchBudgetController.hideBillPreviewModal);
                 document.getElementById('printBillFromModalBtn').addEventListener('click', BranchBudgetController.printSpecificBillFromModal);
+
+                // Employee Detail Modal Listeners
+                document.getElementById('closeEmployeeDetailModalBtn').addEventListener('click', EmployeeController.hideEmployeeDetailModal);
+                document.getElementById('salaryForm').addEventListener('submit', EmployeeController.handleAddSalaryRecord);
+                document.getElementById('leaveForm').addEventListener('submit', EmployeeController.handleAddLeaveRecord);
+                document.getElementById('editEmployeeFromModalBtn').addEventListener('click', EmployeeController.handleEditEmployeeFromModal);
+                document.getElementById('deleteEmployeeFromModalBtn').addEventListener('click', EmployeeController.handleDeleteEmployeeFromModal);
+                document.getElementById('printProfileFromModalBtn').addEventListener('click', EmployeeController.handlePrintProfileFromModal);
+
 
                 // Modal Listeners
                 document.getElementById('cancelAuthBtn').addEventListener('click', UIController.hideAuthModal);
@@ -948,6 +1018,7 @@
                 if (targetPage) {
                     targetPage.classList.remove('hidden'); AppState.currentPage = pageId;
                     if (pageId === 'dashboard') UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); 
+                    if (pageId === 'employees') EmployeeController.loadEmployees();
                     if (pageId === 'balanceTracking') { BalanceTrackingController.updateOverallBalanceDisplay(); BalanceTrackingController.loadAdjustmentHistory(); }
                     if (pageId === 'paymentRequests') PaymentRequestController.loadRequests();
                     if (pageId === 'courierTracking') CourierTrackingController.loadEntries();
@@ -959,13 +1030,11 @@
             loadTransactionsForDashboard: (dateString) => {
                 AppState.targetDateForDashboard = dateString; 
                 document.getElementById('dashboardDateInput').value = dateString; 
-                
                 const displayDate = Utils.formatDateForDisplay(dateString);
                 const isToday = dateString === Utils.getTodayDateString();
                 const dateLabel = `${displayDate} ${isToday ? '(Today)' : '(Selected Date)'}`;
                 document.getElementById('currentDateDisplay').textContent = dateLabel;
                 document.getElementById('summaryDateDisplay').textContent = displayDate;
-
                 const data = StorageService.getItem(`transactions_${dateString}`);
                 if (data && data.transactions) {
                     AppState.currentTransactions = data.transactions.map(tx => ({...tx, tempId: tx.tempId || Utils.generateId()}));
@@ -989,8 +1058,7 @@
                 if (!sn || isNaN(q) || q <= 0 || isNaN(r) || r <= 0) { Utils.showMessage('Validation Error', 'Enter valid Stock Name, Quantity, and Rate.'); return; }
                 const { commissionPerStock, totalStockCommission } = CommissionService.calculateCommission(r, q);
                 AppState.currentTransactions.push({ 
-                    tempId: Utils.generateId(), 
-                    stockName: sn, quantity: q, rate: r, 
+                    tempId: Utils.generateId(), stockName: sn, quantity: q, rate: r, 
                     commissionPerStock, totalStockCommission, 
                     transactionTime: new Date().toLocaleTimeString() 
                 });
@@ -1009,10 +1077,8 @@
                 if (AppState.currentTransactions.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-4">No transactions for this date.</td></tr>'; return; }
                 AppState.currentTransactions.forEach(tx => {
                     const row = tbody.insertRow(); 
-                    row.insertCell().textContent = tx.stockName; 
-                    row.insertCell().textContent = tx.quantity; 
-                    row.insertCell().textContent = Utils.formatCurrency(tx.rate);
-                    row.insertCell().textContent = Utils.formatCurrency(tx.commissionPerStock); 
+                    row.insertCell().textContent = tx.stockName; row.insertCell().textContent = tx.quantity; 
+                    row.insertCell().textContent = Utils.formatCurrency(tx.rate); row.insertCell().textContent = Utils.formatCurrency(tx.commissionPerStock); 
                     row.insertCell().textContent = Utils.formatCurrency(tx.totalStockCommission);
                     const ac = row.insertCell(); const rmBtn = document.createElement('button'); 
                     rmBtn.innerHTML = '<i class="fas fa-trash-alt"></i>'; rmBtn.classList.add('btn', 'btn-danger', 'btn-icon', 'text-xs');
@@ -1023,8 +1089,7 @@
 
             removeTransactionFromCurrentList: (tempId) => { 
                 AppState.currentTransactions = AppState.currentTransactions.filter(tx => tx.tempId !== tempId);
-                UIController.renderCurrentTransactionsTable(); 
-                UIController.updateDailySummaryDisplay();
+                UIController.renderCurrentTransactionsTable(); UIController.updateDailySummaryDisplay();
             },
 
             updateDailySummaryDisplay: () => { 
@@ -1038,29 +1103,16 @@
 
             saveCurrentDayTransactions: () => {
                 const targetDate = AppState.targetDateForDashboard;
-                const existingDataForDate = StorageService.getItem(`transactions_${targetDate}`);
-                if (AppState.currentTransactions.length === 0 && !existingDataForDate) {
-                    Utils.showMessage('No Transactions', `No transactions to save for ${Utils.formatDateForDisplay(targetDate)}.`);
-                    return;
+                if (AppState.currentTransactions.length === 0) {
+                    Utils.showMessage('No Transactions', `No transactions to save for ${Utils.formatDateForDisplay(targetDate)}.`); return;
                 }
-
                 const grossCommission = AppState.currentTransactions.reduce((sum, tx) => sum + tx.totalStockCommission, 0);
                 const deductions = CommissionService.calculateDeductions(grossCommission);
-                const transactionsToSave = AppState.currentTransactions.map(tx => {
-                    const { tempId, ...rest } = tx; 
-                    return { ...rest, transactionTime: tx.transactionTime || new Date().toLocaleTimeString() }; 
-                });
-
-                const dailyReportDataToSave = {
-                    date: targetDate,
-                    transactions: transactionsToSave,
-                    ...deductions
-                };
-
+                const transactionsToSave = AppState.currentTransactions.map(tx => { const { tempId, ...rest } = tx; return { ...rest, transactionTime: tx.transactionTime || new Date().toLocaleTimeString() }; });
+                const dailyReportDataToSave = { date: targetDate, transactions: transactionsToSave, ...deductions };
                 StorageService.setItem(`transactions_${targetDate}`, dailyReportDataToSave);
                 BalanceTrackingController.updateOverallBalanceDisplay(); 
                 Utils.showMessage('Success', `Transactions for ${Utils.formatDateForDisplay(targetDate)} saved successfully.`);
-                UIController.resetDashboardCalculatorFields(); 
             },
 
             displayDailyReport: () => {
@@ -1088,45 +1140,54 @@
                 displayDiv.innerHTML = html; displayDiv.classList.remove('hidden');
             },
             
-            printReport: (type) => {
+            printReport: (type, dataContext = null) => {
                 const titleEl = document.getElementById('printReportTitle'), dateEl = document.getElementById('printReportDate');
                 let content = '', rTitle = 'Report', rDateStr = Utils.formatDateForDisplay(Utils.getTodayDateString());
+                let printSpecificElementId = null;
 
-                if (type === 'daily_current') {
+                if (type === 'salarySlip') {
+                    printSpecificElementId = 'salarySlipPrintView';
+                    rTitle = `Salary Slip for ${Utils.formatMonthForDisplay(dataContext.salary.month)}`;
+                } else if (type === 'employeeProfile') {
+                    printSpecificElementId = 'employeeProfilePrintView';
+                    rTitle = `Employee Profile: ${dataContext.employee.name}`;
+                    EmployeeController.populateProfilePrintView(dataContext.employee);
+                }
+                else if (type === 'daily_current') {
                     if (AppState.currentTransactions.length === 0) { Utils.showMessage('Error', 'No transactions on dashboard to print.'); return; }
-                    rTitle = `Daily Commission Report`;
-                    rDateStr = Utils.formatDateForDisplay(AppState.targetDateForDashboard); 
-
-                    let tempTableHtml = '<table class="min-w-full bg-white"><thead><tr><th>Stock Name</th><th>Quantity</th><th>Rate</th><th>Comm. per Stock</th><th>Total Comm.</th><th>Time</th></tr></thead><tbody>';
-                    AppState.currentTransactions.forEach(tx => {
-                        tempTableHtml += `<tr><td>${tx.stockName}</td><td>${tx.quantity}</td><td>${Utils.formatCurrency(tx.rate)}</td><td>${Utils.formatCurrency(tx.commissionPerStock)}</td><td>${Utils.formatCurrency(tx.totalStockCommission)}</td><td>${tx.transactionTime || 'N/A'}</td></tr>`;
-                    });
-                    tempTableHtml += '</tbody></table>';
-
-                    const currentGross = AppState.currentTransactions.reduce((sum, tx) => sum + tx.totalStockCommission, 0);
-                    const currentDeductions = CommissionService.calculateDeductions(currentGross);
-                    let tempSummaryHtml = `<div class="p-4 bg-gray-100 rounded-lg shadow mt-4">
-                        <h4 class="text-lg font-semibold mb-2">Summary for ${rDateStr}</h4>
-                        <p>Gross Commission: <span class="font-bold">${Utils.formatCurrency(currentDeductions.grossCommission)}</span></p>
-                        <p>Head Office Deduction (40%): <span class="font-bold">${Utils.formatCurrency(currentDeductions.hoDeduction)}</span></p>
-                        <p>Tax Deduction (12% of remaining): <span class="font-bold">${Utils.formatCurrency(currentDeductions.taxDeduction)}</span></p>
-                        <p class="text-blue-600">Final House Commission: <span class="font-bold text-xl">${Utils.formatCurrency(currentDeductions.finalHouseCommission)}</span></p>
-                    </div>`;
-                    content = `<div class="page-container">${tempTableHtml}${tempSummaryHtml}</div>`;
+                    rTitle = `Daily Commission Report`; rDateStr = Utils.formatDateForDisplay(AppState.targetDateForDashboard); 
+                    content = `<div class="page-container">${document.getElementById('dailyTransactionsTable').outerHTML}${document.getElementById('dailySummary').outerHTML}</div>`;
                 }
                 else if (type === 'daily_historical') { const d = document.getElementById('reportDate').value, data = AppState.dailyDataCache[d]; if (!data) { Utils.showMessage('Error', 'View daily report first.'); return; } rTitle = 'Daily Commission Report'; rDateStr = Utils.formatDateForDisplay(data.date); content = `<div class="page-container">${document.getElementById('dailyReportDisplay').innerHTML}</div>`; }
                 else if (type === 'monthly') { const m = document.getElementById('reportMonth').value, data = AppState.monthlyDataCache[m]; if (!data) { Utils.showMessage('Error', 'View monthly report first.'); return; } rTitle = 'Monthly Commission Report'; rDateStr = Utils.formatMonthForDisplay(data.month); content = `<div class="page-container">${document.getElementById('monthlyReportDisplay').innerHTML}</div>`; }
                 else if (type === 'paymentRequests') { rTitle = 'Payment Requests Report'; content = `<div class="page-container"><h3>${document.getElementById('paymentRequestsSummary').innerHTML.replace(/<button.*?<\/button>/gi, '')}</h3>${document.getElementById('paymentRequestsTable').outerHTML}</div>`; }
                 else if (type === 'courierTracking') { rTitle = 'Courier Tracking Report'; content = `<div class="page-container">${document.getElementById('courierTrackingTable').outerHTML}</div>`; }
-                else if (type === 'branchBudget') { rTitle = 'Branch Budget Report'; let tbl = '<table>' + document.getElementById('branchBudgetTable').innerHTML + '</table>'; tbl = tbl.replace(/<th class="action-column">Actions<\/th>/gi, '<th></th>').replace(/<td class="action-column">.*?<\/td>/gi, '<td></td>'); content = `<div class="page-container">${tbl}</div>`; }
+                else if (type === 'branchBudget') { rTitle = 'Branch Budget Report'; let tbl = '<table>' + document.getElementById('branchBudgetTable').innerHTML + '</table>'; tbl = tbl.replace(/<th class="action-column">Actions<\/th>/gi, '').replace(/<td class="action-column">.*?<\/td>/gi, ''); content = `<div class="page-container">${tbl}</div>`; }
                 else { Utils.showMessage('Error', 'Unknown report type.'); return; }
                 
-                titleEl.textContent = rTitle; dateEl.textContent = rDateStr; const origBody = document.body.innerHTML;
-                document.body.innerHTML = document.querySelector('.print-header').outerHTML + content + document.querySelector('.print-footer').outerHTML;
-                window.print(); document.body.innerHTML = origBody; UIController.init(); UIController.navigateTo(AppState.currentPage);
-                if (AppState.currentPage === 'dashboard') { UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); } 
-                if (AppState.currentPage === 'reports') { if (document.getElementById('reportDate').value && AppState.dailyDataCache[document.getElementById('reportDate').value]) UIController.displayDailyReport(); if (document.getElementById('reportMonth').value && AppState.monthlyDataCache[document.getElementById('reportMonth').value]) UIController.displayMonthlyReport(); }
-                if (AppState.currentPage === 'paymentRequests') PaymentRequestController.loadRequests(); if (AppState.currentPage === 'courierTracking') CourierTrackingController.loadEntries(); if (AppState.currentPage === 'branchBudget') BranchBudgetController.loadEntries();
+                titleEl.textContent = rTitle; dateEl.textContent = rDateStr; 
+                const origBody = document.body.innerHTML;
+                
+                let printContentHtml = '';
+                if (printSpecificElementId) {
+                    printContentHtml = document.getElementById(printSpecificElementId).innerHTML;
+                } else {
+                    printContentHtml = document.querySelector('.print-header').outerHTML + content + document.querySelector('.print-footer').outerHTML;
+                }
+
+                document.body.innerHTML = printContentHtml;
+                window.print(); document.body.innerHTML = origBody; 
+                UIController.init(); 
+
+                document.querySelectorAll('nav a[data-page]').forEach(l => l.classList.remove('active'));
+                const activeLink = document.querySelector(`nav a[data-page="${AppState.currentPage}"]`);
+                if(activeLink) activeLink.classList.add('active');
+                
+                UIController.navigateTo(AppState.currentPage);
+
+                if(type === 'salarySlip' || type === 'employeeProfile'){
+                    EmployeeController.showEmployeeDetailModal(dataContext.employee.id);
+                }
             },
 
             showAuthModal: (callback, itemType, itemId) => {
@@ -1141,33 +1202,11 @@
                 UIController.showAuthModal(() => {
                     if (itemType === 'dailyReport') { StorageService.removeItem(`transactions_${itemId}`); delete AppState.dailyDataCache[itemId]; document.getElementById('dailyReportDisplay').innerHTML = `<p class="text-green-500">Report for ${Utils.formatDateForDisplay(itemId)} deleted.</p>`; Utils.showMessage('Success', `Daily report for ${Utils.formatDateForDisplay(itemId)} deleted.`); }
                     else if (itemType === 'monthlyReport') { const keys = StorageService.getAllKeysWithSubPrefix('transactions_'); let c = 0; keys.forEach(k => { if (k.startsWith(`transactions_${itemId}`)) { StorageService.removeItem(k); c++; } }); delete AppState.monthlyDataCache[itemId]; document.getElementById('monthlyReportDisplay').innerHTML = `<p class="text-green-500">Data for ${Utils.formatMonthForDisplay(itemId)} (${c} days) deleted.</p>`; Utils.showMessage('Success', `Data for ${Utils.formatMonthForDisplay(itemId)} deleted.`); }
+                    else if (itemType === 'employee') {
+                        EmployeeController.deleteEmployee(itemId);
+                    }
                     BalanceTrackingController.updateOverallBalanceDisplay();
                 }, itemType, itemId);
-            },
-            refreshAllPagesAfterDataChange: () => {
-                // Reset caches
-                AppState.dailyDataCache = {};
-                AppState.monthlyDataCache = {};
-                // Optionally, try to restore targetDateForDashboard if it was part of settings in backup
-                // For now, default to today or keep current if not restoring settings affecting it
-                AppState.targetDateForDashboard = Utils.getTodayDateString();
-
-
-                // Reload data for all relevant sections by calling their main load functions
-                UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); // Handles dashboard
-                BalanceTrackingController.updateOverallBalanceDisplay();
-                BalanceTrackingController.loadAdjustmentHistory();
-                PaymentRequestController.loadRequests();
-                CourierTrackingController.loadEntries();
-                BranchBudgetController.loadEntries();
-
-                // If on reports page, clear current display
-                if (AppState.currentPage === 'reports') {
-                    document.getElementById('dailyReportDisplay').classList.add('hidden').innerHTML = '';
-                    document.getElementById('monthlyReportDisplay').classList.add('hidden').innerHTML = '';
-                }
-                // Navigate to dashboard to ensure a clean state or refresh current page
-                UIController.navigateTo(AppState.currentPage); 
             }
         };
 
@@ -1182,31 +1221,22 @@
         
         const DataResetService = {
             initiateFullResetProcess: () => {
-                Utils.showConfirmationModal(
-                    "Confirm Data Reset", 
-                    "Are you sure you want to start the full application data reset process? This is irreversible.",
-                    () => { 
-                        UIController.showAuthModal(() => { 
-                            DataResetService.finalConfirmationForReset();
-                        }, 'fullReset', null); 
-                    },
+                Utils.showConfirmationModal( "Confirm Data Reset", "Are you sure you want to start the full application data reset process? This is irreversible.",
+                    () => { UIController.showAuthModal(() => { DataResetService.finalConfirmationForReset(); }, 'fullReset', null); },
                     () => { Utils.showMessage('Cancelled', 'Data reset process cancelled.'); } 
                 );
             },
             finalConfirmationForReset: () => {
-                Utils.showConfirmationModal(
-                    "FINAL WARNING: Erase All Data?",
-                    "All application data (transactions, reports, balances, settings, etc.) will be PERMANENTLY ERASED. This action CANNOT BE UNDONE. Are you absolutely sure you want to proceed?",
-                    () => { 
-                        DataResetService.performFullReset();
-                    },
-                    () => { Utils.showMessage('Cancelled', 'Final data reset cancelled.'); } 
+                Utils.showConfirmationModal( "FINAL WARNING: Erase All Data?", "All application data (transactions, reports, balances, settings, etc.) will be PERMANENTLY ERASED. This action CANNOT BE UNDONE. Are you absolutely sure you want to proceed?",
+                    () => { DataResetService.performFullReset(); }, () => { Utils.showMessage('Cancelled', 'Final data reset cancelled.'); } 
                 );
             },
             performFullReset: () => {
                 StorageService.clearAllAppData(); 
-                UIController.refreshAllPagesAfterDataChange(); // Use centralized refresh
+                AppState.currentTransactions = []; AppState.dailyDataCache = {}; AppState.monthlyDataCache = {};
+                AppState.targetDateForDashboard = Utils.getTodayDateString(); 
                 Utils.showMessage('Success', 'All application data has been reset successfully.');
+                UIController.navigateTo(AppState.currentPage);
             }
         };
 
@@ -1282,43 +1312,15 @@
                 PaymentRequestController.updatePaymentSummary();
             },
             updateStatus: (id, newStatus) => {
-                let requests = PaymentRequestController.getRequests();
-                const requestIndex = requests.findIndex(req => req.id === id);
-
-                if (requestIndex === -1) {
-                    Utils.showMessage('Error', 'Payment request not found.');
-                    return;
-                }
-
-                const oldStatus = requests[requestIndex].status;
-                requests[requestIndex].status = newStatus;
-                PaymentRequestController.saveRequests(requests);
-
+                let requests = PaymentRequestController.getRequests(); const requestIndex = requests.findIndex(req => req.id === id); if (requestIndex === -1) { Utils.showMessage('Error', 'Payment request not found.'); return; }
+                const oldStatus = requests[requestIndex].status; requests[requestIndex].status = newStatus; PaymentRequestController.saveRequests(requests);
                 if (newStatus === 'Approved' && oldStatus !== 'Approved') {
-                    const approvedRequest = requests[requestIndex];
-                    const amountToDeduct = parseFloat(approvedRequest.amount);
-                    const reason = `Approved Payment: ${approvedRequest.description.substring(0,25)} (ID: ${approvedRequest.id.slice(-6).toUpperCase()})`;
-
-                    const adjustmentHistory = BalanceTrackingController.getAdjustmentHistory();
-                    const newAdjustment = {
-                        id: Utils.generateId(),
-                        date: Utils.getTodayDateString(),
-                        amount: -amountToDeduct, 
-                        reason: reason,
-                        type: 'Debit (Payment Appr.)' 
-                    };
-                    adjustmentHistory.unshift(newAdjustment);
-                    BalanceTrackingController.saveAdjustmentHistory(adjustmentHistory);
-                    BalanceTrackingController.updateOverallBalanceDisplay(); 
-
+                    const approvedRequest = requests[requestIndex]; const amountToDeduct = parseFloat(approvedRequest.amount); const reason = `Approved Payment: ${approvedRequest.description.substring(0,25)} (ID: ${approvedRequest.id.slice(-6).toUpperCase()})`;
+                    const adjustmentHistory = BalanceTrackingController.getAdjustmentHistory(); const newAdjustment = { id: Utils.generateId(), date: Utils.getTodayDateString(), amount: -amountToDeduct, reason: reason, type: 'Debit (Payment Appr.)' };
+                    adjustmentHistory.unshift(newAdjustment); BalanceTrackingController.saveAdjustmentHistory(adjustmentHistory); BalanceTrackingController.updateOverallBalanceDisplay(); 
                     Utils.showMessage('Status & Balance Updated', `Request status: ${newStatus}. ${Utils.formatCurrency(amountToDeduct)} deducted from balance.`);
-                    
-                    if (AppState.currentPage === 'balanceTracking') {
-                        BalanceTrackingController.loadAdjustmentHistory();
-                    }
-                } else {
-                     Utils.showMessage('Status Updated', `Request status: ${newStatus}.`);
-                }
+                    if (AppState.currentPage === 'balanceTracking') BalanceTrackingController.loadAdjustmentHistory();
+                } else { Utils.showMessage('Status Updated', `Request status: ${newStatus}.`); }
                 PaymentRequestController.updatePaymentSummary(); 
             },
             deleteRequest: (id) => {
@@ -1336,14 +1338,11 @@
                 document.getElementById('totalPaidAmount').textContent=Utils.formatCurrency(tp); document.getElementById('totalUnpaidApprovedAmount').textContent=Utils.formatCurrency(ua);
             },
             carryOverUnpaidApproved: () => {
-                const rs = PaymentRequestController.getRequests(), cm = Utils.getCurrentMonthYearString();
-                let unpaidApprovedForCarryOver = 0;
+                const rs = PaymentRequestController.getRequests(), cm = Utils.getCurrentMonthYearString(); let unpaidApprovedForCarryOver = 0;
                 rs.filter(req => req.requestDate.startsWith(cm) && req.status === 'Approved').forEach(req => unpaidApprovedForCarryOver += parseFloat(req.amount));
-
                 if (unpaidApprovedForCarryOver <= 0) { Utils.showMessage('No Amount', 'No unpaid "Approved" amounts from current month to carry over.'); return; }
                 Utils.showConfirmationModal('Carry Over Balance', `Carry over ${Utils.formatCurrency(unpaidApprovedForCarryOver)} (unpaid "Approved" from ${Utils.formatMonthForDisplay(cm)}) to balance adjustments as a negative (debit) entry? This will reflect as an expense covered.`, () => {
-                    const rsn = `Carried over unpaid approved from ${Utils.formatMonthForDisplay(cm)}`;
-                    const adjAmt = -unpaidApprovedForCarryOver; 
+                    const rsn = `Carried over unpaid approved from ${Utils.formatMonthForDisplay(cm)}`; const adjAmt = -unpaidApprovedForCarryOver; 
                     const adj = { id: Utils.generateId(), date: Utils.getTodayDateString(), amount: adjAmt, reason: rsn, type: 'Debit (Carry Over)' };
                     const hist = BalanceTrackingController.getAdjustmentHistory(); hist.unshift(adj); BalanceTrackingController.saveAdjustmentHistory(hist);
                     BalanceTrackingController.updateOverallBalanceDisplay(); BalanceTrackingController.loadAdjustmentHistory();
@@ -1393,238 +1392,458 @@
         const BranchBudgetController = {
             STORAGE_KEY: 'branchBudgetEntries', 
             tempBillImagesBase64: [], 
-            currentEditingBillIndex: null, 
+            currentEditingBillIndex: null,
 
             getEntries: () => StorageService.getItem(BranchBudgetController.STORAGE_KEY) || [],
             saveEntries: (e) => StorageService.setItem(BranchBudgetController.STORAGE_KEY, e),
 
             previewBillImages: (ev) => { 
                 BranchBudgetController.tempBillImagesBase64 = [];
-                const previewsContainer = document.getElementById('billImagePreviewsContainer');
-                previewsContainer.innerHTML = ''; 
+                const previewsContainer = document.getElementById('billImagePreviewsContainer'); previewsContainer.innerHTML = '';
                 const files = ev.target.files;
-
                 if (files.length > 0) {
                     previewsContainer.classList.remove('hidden');
                     Array.from(files).forEach((file, index) => {
                         const reader = new FileReader();
                         reader.onload = (e) => {
                             BranchBudgetController.tempBillImagesBase64.push(e.target.result);
-                            const imgWrapper = document.createElement('div');
-                            imgWrapper.classList.add('relative', 'inline-block');
-                            const img = document.createElement('img');
-                            img.src = e.target.result;
-                            img.alt = `Preview ${index + 1}`;
+                            const imgWrapper = document.createElement('div'); imgWrapper.classList.add('relative', 'inline-block');
+                            const img = document.createElement('img'); img.src = e.target.result; img.alt = `Preview ${index + 1}`;
                             img.classList.add('max-h-32', 'max-w-xs', 'rounded', 'border', 'p-1', 'object-contain');
-                            imgWrapper.appendChild(img);
-                            previewsContainer.appendChild(imgWrapper);
+                            imgWrapper.appendChild(img); previewsContainer.appendChild(imgWrapper);
                         };
                         reader.readAsDataURL(file);
                     });
-                } else {
-                    previewsContainer.classList.add('hidden');
-                }
+                } else { previewsContainer.classList.add('hidden'); }
             },
 
             handleAddEntry: (e) => {
                 e.preventDefault(); 
-                const dt = document.getElementById('budgetEntryDate').value, 
-                      itm = document.getElementById('budgetItem').value.trim(), 
-                      amt = parseFloat(document.getElementById('budgetAmount').value);
-
+                const dt = document.getElementById('budgetEntryDate').value, itm = document.getElementById('budgetItem').value.trim(), amt = parseFloat(document.getElementById('budgetAmount').value);
                 if (!dt||!itm||isNaN(amt)||amt<=0) { Utils.showMessage('Validation Error', 'Fill Date, Item, and Amount.'); return; }
-                
-                const ne = {
-                    id:Utils.generateId(),
-                    date:dt,
-                    item:itm,
-                    amount:amt,
-                    billImagesBase64: BranchBudgetController.tempBillImagesBase64, 
-                    entryDate:Utils.getTodayDateString()
-                };
-                const es = BranchBudgetController.getEntries(); 
-                es.unshift(ne); 
-                BranchBudgetController.saveEntries(es); 
-                BranchBudgetController.loadEntries();
-                
-                document.getElementById('branchBudgetForm').reset(); 
-                document.getElementById('billImagePreviewsContainer').innerHTML = ''; 
-                document.getElementById('billImagePreviewsContainer').classList.add('hidden');
-                BranchBudgetController.tempBillImagesBase64 = []; 
+                const ne = { id:Utils.generateId(), date:dt, item:itm, amount:amt, billImagesBase64: BranchBudgetController.tempBillImagesBase64, entryDate:Utils.getTodayDateString() };
+                const es = BranchBudgetController.getEntries(); es.unshift(ne); BranchBudgetController.saveEntries(es); BranchBudgetController.loadEntries();
+                document.getElementById('branchBudgetForm').reset(); document.getElementById('billImagePreviewsContainer').innerHTML = ''; 
+                document.getElementById('billImagePreviewsContainer').classList.add('hidden'); BranchBudgetController.tempBillImagesBase64 = []; 
                 Utils.showMessage('Success', 'Budget entry added.');
             },
 
             loadEntries: () => {
-                const es = BranchBudgetController.getEntries(), tbody = document.getElementById('branchBudgetTable').getElementsByTagName('tbody')[0]; 
-                tbody.innerHTML = '';
+                const es = BranchBudgetController.getEntries(), tbody = document.getElementById('branchBudgetTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
                 if (es.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-3">No budget entries.</td></tr>'; return; }
-                
                 es.forEach(en => {
-                    const r = tbody.insertRow(); 
-                    r.insertCell().textContent = en.id.slice(-6).toUpperCase(); 
-                    r.insertCell().textContent = Utils.formatDateForDisplay(en.date);
-                    r.insertCell().textContent = en.item; 
-                    r.insertCell().textContent = Utils.formatCurrency(en.amount);
-                    
+                    const r = tbody.insertRow(); r.insertCell().textContent = en.id.slice(-6).toUpperCase(); r.insertCell().textContent = Utils.formatDateForDisplay(en.date);
+                    r.insertCell().textContent = en.item; r.insertCell().textContent = Utils.formatCurrency(en.amount);
                     const bc = r.insertCell(); 
                     if (en.billImagesBase64 && en.billImagesBase64.length > 0) { 
-                        const viewBtn = document.createElement('button');
-                        viewBtn.textContent = `View Bill(s) (${en.billImagesBase64.length})`;
+                        const viewBtn = document.createElement('button'); viewBtn.textContent = `View Bill(s) (${en.billImagesBase64.length})`;
                         viewBtn.classList.add('text-blue-600', 'hover:underline', 'text-sm', 'p-0', 'bg-transparent', 'border-none', 'cursor-pointer');
-                        viewBtn.onclick = () => BranchBudgetController.showBillPreviewModal(en.billImagesBase64, en.item);
-                        bc.appendChild(viewBtn);
-                    } else { 
-                        bc.textContent='No Bill(s)'; 
-                    }
-                    
-                    const ac = r.insertCell(); 
-                    ac.classList.add('action-column'); 
-                    const delBtn = document.createElement('button'); 
-                    delBtn.innerHTML='<i class="fas fa-trash-alt"></i>'; 
-                    delBtn.classList.add('btn','btn-danger','btn-icon','text-xs');
-                    delBtn.onclick=()=>BranchBudgetController.deleteEntry(en.id); 
-                    ac.appendChild(delBtn);
+                        viewBtn.onclick = () => BranchBudgetController.showBillPreviewModal(en.billImagesBase64, en.item); bc.appendChild(viewBtn);
+                    } else { bc.textContent='No Bill(s)'; }
+                    const ac = r.insertCell(); ac.classList.add('action-column'); 
+                    const delBtn = document.createElement('button'); delBtn.innerHTML='<i class="fas fa-trash-alt"></i>'; 
+                    delBtn.classList.add('btn','btn-danger','btn-icon','text-xs'); delBtn.onclick=()=>BranchBudgetController.deleteEntry(en.id); ac.appendChild(delBtn);
                 });
             },
 
             deleteEntry: (id) => {
                 Utils.showConfirmationModal('Delete Budget Entry', 'Are you sure you want to delete this budget entry?', () => {
-                    let es = BranchBudgetController.getEntries(); 
-                    es = es.filter(e => e.id !== id); 
-                    BranchBudgetController.saveEntries(es);
-                    BranchBudgetController.loadEntries(); 
-                    Utils.showMessage('Deleted', 'Budget entry deleted.');
+                    let es = BranchBudgetController.getEntries(); es = es.filter(e => e.id !== id); BranchBudgetController.saveEntries(es);
+                    BranchBudgetController.loadEntries(); Utils.showMessage('Deleted', 'Budget entry deleted.');
                 });
             },
 
             showBillPreviewModal: (imagesBase64Array, itemName) => {
                 document.getElementById('billPreviewModalTitle').textContent = `Bill Preview: ${itemName || 'Bill'}`;
-                const modalImagesContainer = document.getElementById('billPreviewImagesContainer');
-                modalImagesContainer.innerHTML = ''; 
-                BranchBudgetController.currentEditingBillIndex = null; 
-
+                const modalImagesContainer = document.getElementById('billPreviewImagesContainer'); modalImagesContainer.innerHTML = '';
+                BranchBudgetController.currentEditingBillIndex = null;
                 const printBillBtnModal = document.getElementById('printBillFromModalBtn');
-
                 if (imagesBase64Array && imagesBase64Array.length > 0) {
                     imagesBase64Array.forEach((base64, index) => {
-                        const img = document.createElement('img');
-                        img.src = base64;
-                        img.alt = `Bill ${index + 1}`;
+                        const img = document.createElement('img'); img.src = base64; img.alt = `Bill ${index + 1}`;
                         img.classList.add('max-w-full', 'max-h-[60vh]', 'object-contain', 'mb-2', 'border', 'rounded');
-                        img.dataset.billIndex = index; 
-                        modalImagesContainer.appendChild(img);
+                        img.dataset.billIndex = index; modalImagesContainer.appendChild(img);
                     });
                     if (imagesBase64Array.length === 1) {
-                        printBillBtnModal.classList.remove('hidden');
-                        printBillBtnModal.dataset.billImage = imagesBase64Array[0]; 
-                    } else {
-                        printBillBtnModal.classList.add('hidden');
-                        delete printBillBtnModal.dataset.billImage;
-                    }
-                } else {
-                     modalImagesContainer.textContent = "No bills to display.";
-                     printBillBtnModal.classList.add('hidden');
-                     delete printBillBtnModal.dataset.billImage;
-                }
+                        printBillBtnModal.classList.remove('hidden'); printBillBtnModal.dataset.billImage = imagesBase64Array[0]; 
+                    } else { printBillBtnModal.classList.add('hidden'); delete printBillBtnModal.dataset.billImage; }
+                } else { modalImagesContainer.textContent = "No bills to display."; printBillBtnModal.classList.add('hidden'); delete printBillBtnModal.dataset.billImage; }
                 document.getElementById('billPreviewModal').classList.remove('hidden');
             },
 
             hideBillPreviewModal: () => {
                 document.getElementById('billPreviewModal').classList.add('hidden');
-                document.getElementById('billPreviewImagesContainer').innerHTML = ""; 
-                BranchBudgetController.currentEditingBillIndex = null;
-                const printBillBtnModal = document.getElementById('printBillFromModalBtn');
-                printBillBtnModal.classList.add('hidden');
-                delete printBillBtnModal.dataset.billImage;
+                document.getElementById('billPreviewImagesContainer').innerHTML = ""; BranchBudgetController.currentEditingBillIndex = null;
+                const printBillBtnModal = document.getElementById('printBillFromModalBtn'); printBillBtnModal.classList.add('hidden'); delete printBillBtnModal.dataset.billImage;
             },
             
             printSpecificBillFromModal: () => {
                 const imageBase64 = document.getElementById('printBillFromModalBtn').dataset.billImage;
-                if (!imageBase64) { 
-                    Utils.showMessage('Error', 'No specific bill selected or available to print from modal.'); 
-                    return; 
-                }
-                
+                if (!imageBase64) { Utils.showMessage('Error', 'No specific bill selected or available to print from modal.'); return; }
                 const printWindow = window.open('', '_blank', 'height=700,width=900'); 
                 printWindow.document.write('<html><head><title>Print Bill</title>');
                 printWindow.document.write('<style> body { margin: 20mm; display: flex; justify-content: center; align-items: flex-start; } img { max-width: 100%; height: auto; object-fit: contain; } @page { size: A4; margin: 20mm; } </style>');
                 printWindow.document.write('</head><body>');
-                printWindow.document.write('<img src="' + imageBase64 + '" onload="window.focus(); setTimeout(function() { window.print(); setTimeout(function(){ printWindow.close(); }, 200); }, 200);">');
+                printWindow.document.write('<img src="' + imageBase64 + '" onload="window.focus(); setTimeout(function() { window.print(); setTimeout(function(){ printWindow.close(); }, 200); }, 200);\">');
                 printWindow.document.write('</body></html>');
                 printWindow.document.close(); 
             }
         };
 
-        // --- DATA BACKUP AND RESTORE CONTROLLER ---
-        const DataBackupRestoreController = {
-            downloadData: () => {
-                try {
-                    const allData = StorageService.exportAllData();
-                    if (allData.length === 0) {
-                        Utils.showMessage("No Data", "There is no data to download.");
-                        return;
+        // --- EMPLOYEE CONTROLLER (FINAL) ---
+        const EmployeeController = {
+            STORAGE_KEY: 'employees',
+            tempPictureBase64: null,
+
+            getEmployees: () => StorageService.getItem(EmployeeController.STORAGE_KEY) || [],
+            saveEmployees: (employees) => StorageService.setItem(EmployeeController.STORAGE_KEY, employees),
+            
+            clearForm: () => {
+                document.getElementById('employeeForm').reset();
+                document.getElementById('employeeId').value = '';
+                document.getElementById('employeePicturePreview').src = 'https://placehold.co/100x100/e2e8f0/e2e8f0?text=.';
+                EmployeeController.tempPictureBase64 = null;
+            },
+
+            previewEmployeePicture: (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        document.getElementById('employeePicturePreview').src = e.target.result;
+                        EmployeeController.tempPictureBase64 = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            },
+            
+            handleAddOrUpdateEmployee: (e) => {
+                e.preventDefault();
+                const id = document.getElementById('employeeId').value;
+                const employeeData = {
+                    name: document.getElementById('employeeName').value.trim(),
+                    designation: document.getElementById('employeeDesignation').value.trim(),
+                    address: document.getElementById('employeeAddress').value.trim(),
+                    cnic: document.getElementById('employeeCnic').value.trim(),
+                    joiningDate: document.getElementById('employeeJoiningDate').value,
+                };
+
+                if (!employeeData.name || !employeeData.designation || !employeeData.joiningDate) {
+                    Utils.showMessage('Validation Error', 'Please fill in Name, Designation, and Joining Date.');
+                    return;
+                }
+
+                let employees = EmployeeController.getEmployees();
+                if (id) { // Update existing employee
+                    const index = employees.findIndex(emp => emp.id === id);
+                    if (index > -1) {
+                        employees[index] = { ...employees[index], ...employeeData };
+                        if (EmployeeController.tempPictureBase64) {
+                            employees[index].pictureBase64 = EmployeeController.tempPictureBase64;
+                        }
                     }
-                    const jsonData = JSON.stringify(allData, null, 2); // Beautify JSON
-                    const blob = new Blob([jsonData], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `darson_securities_backup_${Utils.formatDateForStorage(new Date())}.json`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    Utils.showMessage("Success", "Data downloaded successfully.");
-                } catch (error) {
-                    console.error("Error downloading data:", error);
-                    Utils.showMessage("Error", "Could not download data. " + error.message);
+                } else { // Add new employee
+                    employeeData.id = Utils.generateId();
+                    employeeData.pictureBase64 = EmployeeController.tempPictureBase64;
+                    employeeData.salaries = [];
+                    employeeData.leaves = [];
+                    employees.unshift(employeeData);
+                }
+
+                EmployeeController.saveEmployees(employees);
+                EmployeeController.loadEmployees();
+                EmployeeController.clearForm();
+                Utils.showMessage('Success', `Employee ${id ? 'updated' : 'saved'} successfully.`);
+            },
+            
+            loadEmployees: () => {
+                const employees = EmployeeController.getEmployees();
+                const listContainer = document.getElementById('employeeList');
+                listContainer.innerHTML = '';
+                if (employees.length === 0) {
+                    listContainer.innerHTML = `<p class="text-gray-500 md:col-span-3 text-center">No employees have been added yet.</p>`;
+                    return;
+                }
+                employees.forEach(emp => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-4 rounded-lg shadow border flex flex-col items-center text-center';
+                    card.innerHTML = `
+                        <img src="${emp.pictureBase64 || 'https://placehold.co/100x100/1a3b5d/ffffff?text=' + emp.name.charAt(0)}" alt="${emp.name}" class="w-24 h-24 rounded-full object-cover mb-4 border-4 border-gray-200">
+                        <h4 class="text-lg font-semibold text-gray-800">${emp.name}</h4>
+                        <p class="text-gray-500 mb-4">${emp.designation}</p>
+                        <button class="btn btn-primary w-full mt-auto">View Details & Salary</button>
+                    `;
+                    card.querySelector('button').onclick = () => EmployeeController.showEmployeeDetailModal(emp.id);
+                    listContainer.appendChild(card);
+                });
+            },
+
+            showEmployeeDetailModal: (id) => {
+                const employees = EmployeeController.getEmployees();
+                const employee = employees.find(emp => emp.id === id);
+                if (!employee) return;
+                
+                // Populate Profile
+                document.getElementById('modalEmployeePicture').src = employee.pictureBase64 || 'https://placehold.co/150x150/1a3b5d/ffffff?text=' + employee.name.charAt(0);
+                document.getElementById('modalEmployeeName').textContent = employee.name;
+                document.getElementById('modalEmployeeDesignation').textContent = employee.designation;
+                document.getElementById('modalEmployeeAddress').textContent = employee.address;
+                document.getElementById('modalEmployeeCnic').textContent = employee.cnic;
+                document.getElementById('modalEmployeeJoiningDate').textContent = Utils.formatDateForDisplay(employee.joiningDate);
+
+                // Set up forms
+                document.getElementById('salaryEmployeeId').value = id;
+                document.getElementById('leaveEmployeeId').value = id;
+                document.getElementById('salaryMonth').value = Utils.getCurrentMonthYearString();
+                document.getElementById('leaveMonth').value = Utils.getCurrentMonthYearString();
+                
+                // Store id in buttons for later use
+                document.getElementById('editEmployeeFromModalBtn').dataset.employeeId = id;
+                document.getElementById('deleteEmployeeFromModalBtn').dataset.employeeId = id;
+                document.getElementById('printProfileFromModalBtn').dataset.employeeId = id;
+
+                EmployeeController.renderSalaryHistory(employee);
+                EmployeeController.renderLeaveHistory(employee);
+                document.getElementById('employeeDetailModal').classList.remove('hidden');
+            },
+
+            hideEmployeeDetailModal: () => {
+                document.getElementById('employeeDetailModal').classList.add('hidden');
+            },
+            
+            handleEditEmployeeFromModal: (e) => {
+                const id = e.currentTarget.dataset.employeeId;
+                const employees = EmployeeController.getEmployees();
+                const employee = employees.find(emp => emp.id === id);
+                if (!employee) return;
+                
+                document.getElementById('employeeId').value = employee.id;
+                document.getElementById('employeeName').value = employee.name;
+                document.getElementById('employeeDesignation').value = employee.designation;
+                document.getElementById('employeeAddress').value = employee.address;
+                document.getElementById('employeeCnic').value = employee.cnic;
+                document.getElementById('employeeJoiningDate').value = employee.joiningDate;
+                document.getElementById('employeePicturePreview').src = employee.pictureBase64 || 'https://placehold.co/100x100/e2e8f0/e2e8f0?text=.';
+
+                EmployeeController.hideEmployeeDetailModal();
+                window.scrollTo(0, 0); 
+            },
+
+            handleDeleteEmployeeFromModal: (e) => {
+                const id = e.currentTarget.dataset.employeeId;
+                Utils.showConfirmationModal('Delete Employee?', 'Are you sure you want to delete this employee and all their records? This cannot be undone.', () => {
+                    UIController.requestAuthThenDelete('employee', id);
+                });
+            },
+
+             handlePrintProfileFromModal: (e) => {
+                const id = e.currentTarget.dataset.employeeId;
+                const employees = EmployeeController.getEmployees();
+                const employee = employees.find(emp => emp.id === id);
+                if(employee) {
+                    UIController.printReport('employeeProfile', { employee });
                 }
             },
 
-            initiateRestoreData: () => {
-                const fileInput = document.getElementById('restoreDataInput');
-                if (!fileInput.files || fileInput.files.length === 0) {
-                    Utils.showMessage("No File", "Please select a backup file to restore.");
+            deleteEmployee: (id) => {
+                let employees = EmployeeController.getEmployees();
+                employees = employees.filter(emp => emp.id !== id);
+                EmployeeController.saveEmployees(employees);
+                EmployeeController.hideEmployeeDetailModal();
+                EmployeeController.loadEmployees();
+                Utils.showMessage('Success', 'Employee has been deleted.');
+            },
+
+            renderSalaryHistory: (employee) => {
+                const tbody = document.getElementById('salaryHistoryTable').getElementsByTagName('tbody')[0];
+                tbody.innerHTML = '';
+                if (!employee.salaries || employee.salaries.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-3">No salary records.</td></tr>';
                     return;
                 }
-                const file = fileInput.files[0];
-                const reader = new FileReader();
+                const sortedSalaries = [...employee.salaries].sort((a, b) => b.month.localeCompare(a.month));
 
-                reader.onload = (event) => {
-                    try {
-                        const fileContent = event.target.result;
-                        const parsedData = JSON.parse(fileContent);
-                        
-                        Utils.showConfirmationModal(
-                            "Confirm Data Restore",
-                            "Are you sure you want to restore data from this file? ALL CURRENT DATA in the application will be overwritten. This action cannot be undone.",
-                            () => {
-                                if (StorageService.importAllData(parsedData)) {
-                                    UIController.refreshAllPagesAfterDataChange();
-                                    Utils.showMessage("Success", "Data restored successfully from " + file.name + ".");
-                                } else {
-                                    Utils.showMessage("Restore Failed", "Could not restore data. The file might be invalid or empty.");
-                                }
-                                fileInput.value = ''; // Reset file input
-                            },
-                            () => {
-                                Utils.showMessage("Cancelled", "Data restore cancelled.");
-                                fileInput.value = ''; // Reset file input
-                            }
-                        );
-                    } catch (error) {
-                        console.error("Error reading or parsing backup file:", error);
-                        Utils.showMessage("File Error", "Could not read or parse the backup file. It may be corrupted or not a valid JSON backup. " + error.message);
-                        fileInput.value = ''; // Reset file input
+                sortedSalaries.forEach(salary => {
+                    const row = tbody.insertRow();
+                    const totalSalary = (salary.amount || 0) + (salary.allowances || 0) + (salary.incentives || 0);
+                    row.insertCell().textContent = Utils.formatMonthForDisplay(salary.month);
+                    row.insertCell().textContent = Utils.formatCurrency(totalSalary);
+                    
+                    const statusCell = row.insertCell();
+                    const statusSelect = document.createElement('select');
+                    statusSelect.className = `p-1 border rounded-md text-sm w-full ${salary.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+                    statusSelect.innerHTML = `<option value="Unpaid">Unpaid</option><option value="Paid">Paid</option>`;
+                    statusSelect.value = salary.status;
+                    statusSelect.onchange = (e) => {
+                        statusSelect.className = `p-1 border rounded-md text-sm w-full ${e.target.value === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+                        EmployeeController.updateSalaryStatus(employee.id, salary.month, e.target.value);
+                    };
+                    statusCell.appendChild(statusSelect);
+
+                    const actionsCell = row.insertCell(); actionsCell.className = 'no-print';
+                    const printBtn = document.createElement('button');
+                    printBtn.innerHTML = '<i class="fas fa-print"></i>'; printBtn.title = 'Print Slip';
+                    printBtn.className = 'btn btn-secondary btn-icon text-xs';
+                    printBtn.onclick = () => EmployeeController.printSalarySlip(employee, salary);
+                    actionsCell.appendChild(printBtn);
+                });
+            },
+
+            handleAddSalaryRecord: (e) => {
+                e.preventDefault();
+                const employeeId = document.getElementById('salaryEmployeeId').value;
+                const month = document.getElementById('salaryMonth').value;
+                const amount = parseFloat(document.getElementById('salaryAmount').value) || 0;
+                const allowances = parseFloat(document.getElementById('salaryAllowances').value) || 0;
+                const incentives = parseFloat(document.getElementById('salaryIncentives').value) || 0;
+
+                if (!month || (amount + allowances + incentives) <= 0) {
+                    Utils.showMessage('Validation Error', 'Please select a month and enter a valid salary amount.'); return;
+                }
+
+                let employees = EmployeeController.getEmployees();
+                const empIndex = employees.findIndex(emp => emp.id === employeeId);
+                if (empIndex > -1) {
+                    if (!employees[empIndex].salaries) employees[empIndex].salaries = [];
+                    if (employees[empIndex].salaries.some(s => s.month === month)) {
+                        Utils.showMessage('Error', `A salary record for ${Utils.formatMonthForDisplay(month)} already exists.`); return;
                     }
-                };
+                    employees[empIndex].salaries.push({ month, amount, allowances, incentives, status: 'Unpaid' });
+                    EmployeeController.saveEmployees(employees);
+                    EmployeeController.renderSalaryHistory(employees[empIndex]);
+                    document.getElementById('salaryForm').reset();
+                    document.getElementById('salaryMonth').value = Utils.getCurrentMonthYearString();
+                }
+            },
 
-                reader.onerror = () => {
-                    Utils.showMessage("File Read Error", "Could not read the selected file.");
-                    fileInput.value = ''; // Reset file input
-                };
-                reader.readAsText(file);
-            }
+            updateSalaryStatus: (employeeId, month, newStatus) => {
+                let employees = EmployeeController.getEmployees();
+                const empIndex = employees.findIndex(emp => emp.id === employeeId);
+                if (empIndex > -1) {
+                    const salaryIndex = employees[empIndex].salaries.findIndex(s => s.month === month);
+                    if (salaryIndex > -1) {
+                        employees[empIndex].salaries[salaryIndex].status = newStatus;
+                        EmployeeController.saveEmployees(employees);
+                    }
+                }
+            },
+            
+            printSalarySlip: (employee, salary) => {
+                const netSalary = (salary.amount || 0) + (salary.allowances || 0) + (salary.incentives || 0);
+                document.getElementById('slipEmployeeName').textContent = employee.name;
+                document.getElementById('slipEmployeeDesignation').textContent = employee.designation;
+                document.getElementById('slipEmployeeAddress').textContent = employee.address;
+                document.getElementById('slipEmployeeCnic').textContent = employee.cnic;
+                document.getElementById('slipSalaryMonth').textContent = Utils.formatMonthForDisplay(salary.month);
+                document.getElementById('slipPrintDate').textContent = Utils.formatDateForDisplay(Utils.getTodayDateString());
+                document.getElementById('slipBasicSalary').textContent = parseFloat(salary.amount || 0).toFixed(2);
+                document.getElementById('slipAllowances').textContent = parseFloat(salary.allowances || 0).toFixed(2);
+                document.getElementById('slipIncentives').textContent = parseFloat(salary.incentives || 0).toFixed(2);
+                document.getElementById('slipNetSalary').textContent = parseFloat(netSalary).toFixed(2);
+                
+                 UIController.printReport('salarySlip', { employee: employee, salary: salary });
+            },
+
+            populateProfilePrintView: (employee) => {
+                let salaryHistoryHtml = '<tr><td colspan="3" class="text-center">No salary history.</td></tr>';
+                if(employee.salaries && employee.salaries.length > 0) {
+                    salaryHistoryHtml = [...employee.salaries].sort((a,b) => b.month.localeCompare(a.month)).map(s => `
+                        <tr>
+                            <td>${Utils.formatMonthForDisplay(s.month)}</td>
+                            <td>${Utils.formatCurrency((s.amount || 0) + (s.allowances || 0) + (s.incentives || 0))}</td>
+                            <td>${s.status}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                let leaveHistoryHtml = '<tr><td colspan="2" class="text-center">No leave history.</td></tr>';
+                if(employee.leaves && employee.leaves.length > 0) {
+                     leaveHistoryHtml = [...employee.leaves].sort((a,b) => b.month.localeCompare(a.month)).map(l => `
+                        <tr>
+                            <td>${Utils.formatMonthForDisplay(l.month)}</td>
+                            <td>${l.count}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                const printHTML = `
+                     <div class="p-8" style="font-family: Arial, sans-serif;">
+                        <header class="text-center mb-8 pb-4 border-b-2 border-black">
+                            <h1 class="text-3xl font-bold text-black">Darson Securities Limited</h1>
+                            <p class="text-lg text-black">Sargodha Branch</p>
+                            <h2 class="text-2xl font-semibold mt-4 text-black">Employee Profile</h2>
+                        </header>
+                        <section class="mb-6 grid grid-cols-3 gap-6 items-center">
+                             <div class="col-span-1">
+                                <img src="${employee.pictureBase64 || 'https://placehold.co/150x150/1a3b5d/ffffff?text=' + employee.name.charAt(0)}" alt="Pic" class="w-32 h-32 rounded-full object-cover border-4 border-gray-200">
+                             </div>
+                             <div class="col-span-2 space-y-2 text-sm">
+                                <p><strong>Name:</strong> ${employee.name}</p>
+                                <p><strong>Designation:</strong> ${employee.designation}</p>
+                                <p><strong>Address:</strong> ${employee.address}</p>
+                                <p><strong>CNIC:</strong> ${employee.cnic}</p>
+                                <p><strong>Joining Date:</strong> ${Utils.formatDateForDisplay(employee.joiningDate)}</p>
+                             </div>
+                        </section>
+                        <div class="grid grid-cols-2 gap-8">
+                            <div>
+                                <h3 class="text-xl font-semibold mb-2">Salary History</h3>
+                                <table class="w-full"><thead><tr><th>Month</th><th>Total Salary</th><th>Status</th></tr></thead><tbody>${salaryHistoryHtml}</tbody></table>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-semibold mb-2">Leave History</h3>
+                                <table class="w-full"><thead><tr><th>Month</th><th>Leaves</th></tr></thead><tbody>${leaveHistoryHtml}</tbody></table>
+                            </div>
+                        </div>
+                        <footer class="text-center text-xs text-gray-600 mt-12 pt-4 border-t">
+                            Generated on ${Utils.formatDateForDisplay(Utils.getTodayDateString())}
+                        </footer>
+                    </div>
+                `;
+                document.getElementById('employeeProfilePrintView').innerHTML = printHTML;
+            },
+
+            renderLeaveHistory: (employee) => {
+                const tbody = document.getElementById('leaveHistoryTable').getElementsByTagName('tbody')[0];
+                tbody.innerHTML = '';
+                if (!employee.leaves || employee.leaves.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="2" class="text-center text-gray-500 py-3">No leave records.</td></tr>';
+                    return;
+                }
+                const sortedLeaves = [...employee.leaves].sort((a, b) => b.month.localeCompare(a.month));
+                sortedLeaves.forEach(leave => {
+                    const row = tbody.insertRow();
+                    row.insertCell().textContent = Utils.formatMonthForDisplay(leave.month);
+                    row.insertCell().textContent = leave.count;
+                });
+            },
+
+            handleAddLeaveRecord: (e) => {
+                e.preventDefault();
+                const employeeId = document.getElementById('leaveEmployeeId').value;
+                const month = document.getElementById('leaveMonth').value;
+                const count = parseInt(document.getElementById('leaveCount').value);
+
+                if (!month || isNaN(count) || count < 0) {
+                    Utils.showMessage('Validation Error', 'Please select a month and enter a valid number of leaves.'); return;
+                }
+
+                let employees = EmployeeController.getEmployees();
+                const empIndex = employees.findIndex(emp => emp.id === employeeId);
+                if (empIndex > -1) {
+                    if (!employees[empIndex].leaves) employees[empIndex].leaves = [];
+                    const leaveIndex = employees[empIndex].leaves.findIndex(l => l.month === month);
+                    if (leaveIndex > -1) {
+                         employees[empIndex].leaves[leaveIndex].count = count; // Update if exists
+                    } else {
+                        employees[empIndex].leaves.push({ month, count });
+                    }
+                    EmployeeController.saveEmployees(employees);
+                    EmployeeController.renderLeaveHistory(employees[empIndex]);
+                    document.getElementById('leaveForm').reset();
+                    document.getElementById('leaveMonth').value = Utils.getCurrentMonthYearString();
+                }
+            },
         };
 
         document.addEventListener('DOMContentLoaded', UIController.init);
