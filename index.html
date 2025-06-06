@@ -412,40 +412,53 @@
             <!-- Balance Tracking Page -->
             <div id="balanceTrackingPage" class="page-container hidden">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Balance Tracking & Settings</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="p-6 bg-blue-50 rounded-lg shadow">
-                        <h3 class="text-xl font-semibold text-blue-700 mb-2">Current Overall Balance</h3>
-                        <p id="currentOverallBalance" class="text-3xl font-bold text-blue-800">PKR 0.00</p>
-                        <p class="text-sm text-gray-600">This balance reflects the cumulative final house commission after all deductions from saved daily transactions and adjustments.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Column 1 -->
+                    <div class="space-y-6">
+                        <div class="p-6 bg-blue-50 rounded-lg shadow">
+                            <h3 class="text-xl font-semibold text-blue-700 mb-2">Current Overall Balance</h3>
+                            <p id="currentOverallBalance" class="text-3xl font-bold text-blue-800">PKR 0.00</p>
+                        </div>
+                        <div class="p-6 bg-green-50 rounded-lg shadow">
+                            <h3 class="text-xl font-semibold text-green-700 mb-2">Manual Balance Adjustment</h3>
+                             <label for="manualCommissionAmount" class="block text-sm font-medium text-gray-700">Amount to Add/Subtract:</label>
+                            <input type="number" id="manualCommissionAmount" step="0.01" class="mt-1 mb-2 p-2 border rounded-md w-full" placeholder="Enter amount (e.g., 1000 or -500)">
+                            <label for="manualCommissionReason" class="block text-sm font-medium text-gray-700">Reason:</label>
+                            <input type="text" id="manualCommissionReason" class="mt-1 mb-3 p-2 border rounded-md w-full" placeholder="e.g., Previous month carry-over">
+                            <button id="addManualCommissionBtn" class="btn btn-primary w-full"><i class="fas fa-plus-circle mr-2"></i>Adjust Balance</button>
+                        </div>
+                        <div class="p-6 bg-yellow-50 rounded-lg shadow">
+                            <h3 class="text-xl font-semibold text-yellow-800 mb-3">Month End Operations</h3>
+                            <p class="text-sm text-gray-600 mb-3">Finalize the current month's earnings.</p>
+                            <button id="newMonthBtn" class="btn btn-primary"><i class="fas fa-calendar-check mr-2"></i>Finalize Current Month</button>
+                            <p id="newMonthStatus" class="mt-2 text-sm text-gray-700"></p>
+                        </div>
                     </div>
-                    <div class="p-6 bg-green-50 rounded-lg shadow">
-                        <h3 class="text-xl font-semibold text-green-700 mb-2">Manual Balance Adjustment</h3>
-                         <label for="manualCommissionAmount" class="block text-sm font-medium text-gray-700">Amount to Add/Subtract:</label>
-                        <input type="number" id="manualCommissionAmount" step="0.01" class="mt-1 mb-2 p-2 border rounded-md w-full" placeholder="Enter amount (e.g., 1000 or -500)">
-                        <label for="manualCommissionReason" class="block text-sm font-medium text-gray-700">Reason:</label>
-                        <input type="text" id="manualCommissionReason" class="mt-1 mb-3 p-2 border rounded-md w-full" placeholder="e.g., Previous month carry-over">
-                        <button id="addManualCommissionBtn" class="btn btn-primary w-full"><i class="fas fa-plus-circle mr-2"></i>Adjust Balance</button>
+                    <!-- Column 2 -->
+                    <div class="space-y-6">
+                        <div class="p-6 bg-purple-50 rounded-lg shadow">
+                            <h3 class="text-xl font-semibold text-purple-700 mb-3"><i class="fas fa-database mr-2"></i>Data Backup & Restore</h3>
+                            <p class="text-sm text-gray-600 mb-4">Download all your application data into a single file for backup.</p>
+                            <button id="downloadDataBtn" class="btn btn-primary w-full mb-4"><i class="fas fa-download mr-2"></i>Download Data</button>
+                            <p class="text-sm text-gray-600 mb-2">Restore data from a previously downloaded backup file. This will overwrite all current data.</p>
+                            <input type="file" id="restoreDataInput" accept=".json" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200">
+                             <button id="restoreDataBtn" class="btn btn-secondary w-full mt-2"><i class="fas fa-upload mr-2"></i>Upload & Restore Data</button>
+                        </div>
+                         <div class="p-6 bg-red-50 border border-red-300 rounded-lg shadow">
+                            <h3 class="text-xl font-semibold text-red-700 mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>Danger Zone</h3>
+                            <p class="text-sm text-gray-700 mb-4">Permanently erase ALL application data. This cannot be undone.</p>
+                            <button id="resetApplicationDataBtn" class="btn btn-danger"><i class="fas fa-bomb mr-2"></i>Reset All Data</button>
+                        </div>
                     </div>
-                </div>
-                <div class="mt-8 p-6 bg-yellow-50 rounded-lg shadow">
-                    <h3 class="text-xl font-semibold text-yellow-800 mb-3">Month End Operations</h3>
-                    <p class="text-sm text-gray-600 mb-3">At the end of a month, you can finalize the month's earnings. This does not automatically reset the overall balance but logs the month's performance.</p>
-                    <button id="newMonthBtn" class="btn btn-primary"><i class="fas fa-calendar-check mr-2"></i>Finalize Current Month & Prepare for New Month</button>
-                    <p id="newMonthStatus" class="mt-2 text-sm text-gray-700"></p>
                 </div>
                  <div class="mt-8">
                     <h3 class="text-xl font-semibold mb-4">Balance Adjustment History</h3>
-                    <div class="overflow-x-auto">
+                    <div class="overflow-x-auto max-h-80">
                         <table id="balanceAdjustmentHistoryTable" class="min-w-full bg-white">
                             <thead><tr><th>Date</th><th>Reason</th><th>Amount</th><th>Type</th></tr></thead>
                             <tbody></tbody>
                         </table>
                     </div>
-                </div>
-                <div class="mt-12 p-6 bg-red-50 border border-red-300 rounded-lg shadow">
-                    <h3 class="text-xl font-semibold text-red-700 mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>Danger Zone</h3>
-                    <p class="text-sm text-gray-700 mb-4">Warning: Resetting the application will permanently erase ALL data, including transactions, reports, balances, and settings. This action cannot be undone.</p>
-                    <button id="resetApplicationDataBtn" class="btn btn-danger"><i class="fas fa-bomb mr-2"></i>Reset All Application Data</button>
                 </div>
             </div>
 
@@ -622,7 +635,7 @@
                 </div>
             </div>
             
-            <!-- Employee Detail Modal (FINAL) -->
+            <!-- Employee Detail Modal -->
             <div id="employeeDetailModal" class="modal hidden">
                 <div class="modal-content modal-lg">
                     <div class="flex justify-between items-start">
@@ -878,19 +891,16 @@
             getItem: (key) => { const item = localStorage.getItem(StorageService.prefix + key); return item ? JSON.parse(item) : null; },
             setItem: (key, value) => localStorage.setItem(StorageService.prefix + key, JSON.stringify(value)),
             removeItem: (key) => localStorage.removeItem(StorageService.prefix + key),
-            getAllKeysWithSubPrefix: (subPrefix) => {
+            getAllKeysWithPrefix: (subPrefix) => {
                 const keys = [];
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
-                    if (key.startsWith(StorageService.prefix + subPrefix)) keys.push(key.replace(StorageService.prefix, ''));
+                    if (key.startsWith(StorageService.prefix + subPrefix)) keys.push(key);
                 }
                 return keys;
             },
             clearAllAppData: () => {
-                const keysToRemove = [];
-                for (let i = 0; i < localStorage.length; i++) {
-                    if (localStorage.key(i).startsWith(StorageService.prefix)) keysToRemove.push(localStorage.key(i));
-                }
+                const keysToRemove = StorageService.getAllKeysWithPrefix('');
                 keysToRemove.forEach(key => localStorage.removeItem(key));
             }
         };
@@ -979,6 +989,9 @@
                 document.getElementById('addManualCommissionBtn').addEventListener('click', BalanceTrackingController.addManualBalanceAdjustment);
                 document.getElementById('newMonthBtn').addEventListener('click', BalanceTrackingController.finalizeCurrentMonth);
                 document.getElementById('resetApplicationDataBtn').addEventListener('click', DataResetService.initiateFullResetProcess);
+                document.getElementById('downloadDataBtn').addEventListener('click', DataResetService.downloadData);
+                document.getElementById('restoreDataBtn').addEventListener('click', DataResetService.handleRestoreData);
+
 
                 // Payment Requests Listeners
                 document.getElementById('paymentRequestForm').addEventListener('submit', PaymentRequestController.handleAddRequest);
@@ -1128,8 +1141,8 @@
 
             displayMonthlyReport: () => {
                 const rmy = document.getElementById('reportMonth').value; if (!rmy) { Utils.showMessage('Input Required', 'Select month.'); return; }
-                const keys = StorageService.getAllKeysWithSubPrefix('transactions_');
-                const reports = keys.filter(k => k.startsWith(`transactions_${rmy}`)).map(k => StorageService.getItem(k)).filter(d => d).sort((a,b) => new Date(a.date) - new Date(b.date));
+                const keys = StorageService.getAllKeysWithPrefix('transactions_');
+                const reports = keys.map(key => StorageService.getItem(key.replace(StorageService.prefix, ''))).filter(d => d && d.date && d.date.startsWith(rmy)).sort((a,b) => new Date(a.date) - new Date(b.date));
                 const displayDiv = document.getElementById('monthlyReportDisplay');
                 if (reports.length === 0) { displayDiv.innerHTML = `<p class="text-red-500">No data for ${Utils.formatMonthForDisplay(rmy)}.</p>`; displayDiv.classList.remove('hidden'); return; }
                 let tg=0, th=0, tt=0, tf=0; reports.forEach(d => { tg+=d.grossCommission; th+=d.hoDeduction; tt+=d.taxDeduction; tf+=d.finalHouseCommission; });
@@ -1201,7 +1214,7 @@
             requestAuthThenDelete: (itemType, itemId) => {
                 UIController.showAuthModal(() => {
                     if (itemType === 'dailyReport') { StorageService.removeItem(`transactions_${itemId}`); delete AppState.dailyDataCache[itemId]; document.getElementById('dailyReportDisplay').innerHTML = `<p class="text-green-500">Report for ${Utils.formatDateForDisplay(itemId)} deleted.</p>`; Utils.showMessage('Success', `Daily report for ${Utils.formatDateForDisplay(itemId)} deleted.`); }
-                    else if (itemType === 'monthlyReport') { const keys = StorageService.getAllKeysWithSubPrefix('transactions_'); let c = 0; keys.forEach(k => { if (k.startsWith(`transactions_${itemId}`)) { StorageService.removeItem(k); c++; } }); delete AppState.monthlyDataCache[itemId]; document.getElementById('monthlyReportDisplay').innerHTML = `<p class="text-green-500">Data for ${Utils.formatMonthForDisplay(itemId)} (${c} days) deleted.</p>`; Utils.showMessage('Success', `Data for ${Utils.formatMonthForDisplay(itemId)} deleted.`); }
+                    else if (itemType === 'monthlyReport') { const keys = StorageService.getAllKeysWithSubPrefix('transactions_'); let c = 0; keys.forEach(k => { if (k.startsWith(`${StorageService.prefix}transactions_${itemId}`)) { StorageService.removeItem(k.replace(StorageService.prefix, '')); c++; } }); delete AppState.monthlyDataCache[itemId]; document.getElementById('monthlyReportDisplay').innerHTML = `<p class="text-green-500">Data for ${Utils.formatMonthForDisplay(itemId)} (${c} days) deleted.</p>`; Utils.showMessage('Success', `Data for ${Utils.formatMonthForDisplay(itemId)} deleted.`); }
                     else if (itemType === 'employee') {
                         EmployeeController.deleteEmployee(itemId);
                     }
@@ -1233,10 +1246,64 @@
             },
             performFullReset: () => {
                 StorageService.clearAllAppData(); 
-                AppState.currentTransactions = []; AppState.dailyDataCache = {}; AppState.monthlyDataCache = {};
-                AppState.targetDateForDashboard = Utils.getTodayDateString(); 
                 Utils.showMessage('Success', 'All application data has been reset successfully.');
-                UIController.navigateTo(AppState.currentPage);
+                location.reload();
+            },
+            downloadData: () => {
+                const allData = {};
+                const keys = StorageService.getAllKeysWithPrefix('');
+                if (keys.length === 0) {
+                    Utils.showMessage('No Data', 'There is no data to download.');
+                    return;
+                }
+                keys.forEach(key => {
+                    allData[key] = localStorage.getItem(key);
+                });
+
+                const jsonString = JSON.stringify(allData, null, 2);
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `darson_securities_backup_${Utils.getTodayDateString()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                Utils.showMessage('Success', 'Data has been downloaded successfully.');
+            },
+            handleRestoreData: () => {
+                const fileInput = document.getElementById('restoreDataInput');
+                if (fileInput.files.length === 0) {
+                    Utils.showMessage('No File Selected', 'Please select a backup file to restore.');
+                    return;
+                }
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        Utils.showConfirmationModal('Confirm Restore', 'Are you sure you want to restore data from this file? All current data will be overwritten.',
+                            () => {
+                                StorageService.clearAllAppData();
+                                for (const key in data) {
+                                    if(Object.prototype.hasOwnProperty.call(data, key)){
+                                        localStorage.setItem(key, data[key]);
+                                    }
+                                }
+                                Utils.showMessage('Success', 'Data has been restored successfully. The application will now reload.');
+                                setTimeout(() => location.reload(), 1500);
+                            },
+                            () => {
+                                fileInput.value = ''; // Reset file input
+                            }
+                        );
+                    } catch (error) {
+                        Utils.showMessage('Error', 'The selected file is not a valid backup file. Please try again.');
+                        fileInput.value = '';
+                    }
+                };
+                reader.readAsText(file);
             }
         };
 
@@ -1248,8 +1315,8 @@
             saveAdjustmentHistory: (h) => StorageService.setItem(BalanceTrackingController.ADJUSTMENT_HISTORY_KEY, h),
 
             updateOverallBalanceDisplay: () => {
-                let bal = 0; const keys = StorageService.getAllKeysWithSubPrefix('transactions_');
-                keys.forEach(k => { const d = StorageService.getItem(k); if (d && d.finalHouseCommission) bal += parseFloat(d.finalHouseCommission); });
+                let bal = 0; const keys = StorageService.getAllKeysWithPrefix('transactions_');
+                keys.forEach(key => { const d = StorageService.getItem(key.replace(StorageService.prefix, '')); if (d && d.finalHouseCommission) bal += parseFloat(d.finalHouseCommission); });
                 const adj = BalanceTrackingController.getAdjustmentHistory(); adj.forEach(a => bal += parseFloat(a.amount));
                 const s = BalanceTrackingController.getSettings(); s.overallBalance = bal; BalanceTrackingController.saveSettings(s);
                 document.getElementById('currentOverallBalance').textContent = Utils.formatCurrency(s.overallBalance);
@@ -1276,8 +1343,8 @@
             finalizeCurrentMonth: () => {
                 const cmy = Utils.getCurrentMonthYearString(), s = BalanceTrackingController.getSettings();
                 if (s.lastFinalizedMonth === cmy) { Utils.showMessage('Info', `Month ${Utils.formatMonthForDisplay(cmy)} already finalized.`); return; }
-                const keys = StorageService.getAllKeysWithSubPrefix('transactions_'); let me = 0;
-                keys.forEach(k => { if (k.startsWith(`transactions_${cmy}`)) { const d = StorageService.getItem(k); if (d && d.finalHouseCommission) me += parseFloat(d.finalHouseCommission); } });
+                const keys = StorageService.getAllKeysWithPrefix('transactions_'); let me = 0;
+                keys.forEach(key => { const d = StorageService.getItem(key.replace(StorageService.prefix, '')); if (d && d.date && d.date.startsWith(cmy) && d.finalHouseCommission) me += parseFloat(d.finalHouseCommission); });
                 s.lastFinalizedMonth = cmy; BalanceTrackingController.saveSettings(s);
                 const stEl = document.getElementById('newMonthStatus');
                 stEl.textContent = `Month ${Utils.formatMonthForDisplay(cmy)} finalized (Earnings: ${Utils.formatCurrency(me)}). Ready for new month.`;
