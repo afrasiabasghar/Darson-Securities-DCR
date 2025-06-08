@@ -6,6 +6,9 @@
     <title>Darson Securities Commission Software</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
     <style>
         /* Custom scrollbar for better aesthetics */
         ::-webkit-scrollbar {
@@ -64,14 +67,14 @@
         }
 
         /* Form elements styling */
-        input[type="text"], input[type="number"], input[type="date"], input[type="password"], input[type="month"], select, textarea {
+        input[type="text"], input[type="number"], input[type="date"], input[type="password"], input[type="email"], input[type="month"], select, textarea {
             border: 1px solid #cbd5e1; /* cool-gray-300 */
             padding: 0.5rem 0.75rem;
             border-radius: 0.375rem; /* md */
             transition: border-color 0.3s ease, box-shadow 0.3s ease;
             width: 100%;
         }
-        input[type="text"]:focus, input[type="number"]:focus, input[type="date"]:focus, input[type="password"]:focus, input[type="month"]:focus, select:focus, textarea:focus {
+        input[type="text"]:focus, input[type="number"]:focus, input[type="date"]:focus, input[type="password"]:focus, input[type="email"]:focus, input[type="month"]:focus, select:focus, textarea:focus {
             border-color: #2a5282; /* Darson blue */
             box-shadow: 0 0 0 3px rgba(42, 82, 130, 0.2); /* Darson blue focus ring */
             outline: none;
@@ -238,8 +241,64 @@
     </style>
 </head>
 <body class="bg-gray-100">
-    <div id="app" class="flex flex-col min-h-screen">
-        <!-- Navigation -->
+
+    <div id="authPage" class="flex items-center justify-center min-h-screen">
+        <div class="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-lg">
+            <div>
+                <h2 class="text-3xl font-extrabold text-center text-gray-900">Darson Securities</h2>
+                <p class="mt-2 text-center text-sm text-gray-600">Sign in to your account</p>
+            </div>
+            <form id="loginForm" class="mt-8 space-y-6">
+                <div class="rounded-md shadow-sm -space-y-px">
+                    <div>
+                        <label for="email-address" class="sr-only">Email address</label>
+                        <input id="email-address" name="email" type="email" autocomplete="email" required class="rounded-t-md" placeholder="Email address">
+                    </div>
+                    <div>
+                        <label for="password" class="sr-only">Password</label>
+                        <input id="password" name="password" type="password" autocomplete="current-password" required class="rounded-b-md" placeholder="Password">
+                    </div>
+                </div>
+                 <p id="authError" class="text-red-500 text-sm mt-2 hidden"></p>
+                <div>
+                    <button type="submit" id="signInBtn" class="btn btn-primary w-full">Sign In</button>
+                </div>
+            </form>
+            <div class="text-center">
+                <p class="text-sm">
+                    Don't have an account?
+                    <a href="#" id="showSignUp" class="font-medium text-indigo-600 hover:text-indigo-500">Sign Up</a>
+                </p>
+            </div>
+
+             <form id="signUpForm" class="mt-8 space-y-6 hidden">
+                <div class="rounded-md shadow-sm -space-y-px">
+                    <div>
+                        <label for="signUpEmail" class="sr-only">Email address</label>
+                        <input id="signUpEmail" type="email" required class="rounded-t-md" placeholder="Email address">
+                    </div>
+                    <div>
+                        <label for="signUpPassword" class="sr-only">Password</label>
+                        <input id="signUpPassword" type="password" required class="border-t-0 rounded-b-md" placeholder="Password (min. 6 characters)">
+                    </div>
+                </div>
+                <p id="signUpError" class="text-red-500 text-sm mt-2 hidden"></p>
+                <div>
+                     <button type="submit" id="signUpBtn" class="btn btn-primary w-full">Sign Up</button>
+                </div>
+            </form>
+            <div id="backToLoginDiv" class="text-center hidden">
+                 <p class="text-sm">
+                    Already have an account?
+                    <a href="#" id="showLogin" class="font-medium text-indigo-600 hover:text-indigo-500">Sign In</a>
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+
+    <div id="app" class="hidden flex-col min-h-screen">
         <nav id="sidebar" class="p-4 shadow-md">
             <div class="container mx-auto flex flex-wrap items-center justify-between">
                 <div class="text-2xl font-bold">Darson Securities</div>
@@ -254,20 +313,18 @@
                     <a href="#" class="block md:inline-block px-3 py-2" data-page="paymentRequests"><i class="fas fa-file-invoice-dollar nav-icon"></i>Payment Requests</a>
                     <a href="#" class="block md:inline-block px-3 py-2" data-page="courierTracking"><i class="fas fa-truck nav-icon"></i>Courier Tracking</a>
                     <a href="#" class="block md:inline-block px-3 py-2" data-page="branchBudget"><i class="fas fa-landmark nav-icon"></i>Branch Budget</a>
+                    <button id="logoutBtn" class="block md:inline-block px-3 py-2 text-left w-full md:w-auto"><i class="fas fa-sign-out-alt nav-icon"></i>Logout</button>
                 </div>
             </div>
         </nav>
 
-        <!-- Main Content Area -->
         <main class="container mx-auto p-4 flex-grow">
-            <!-- Print Header (for all printable sections) -->
             <div class="print-header">
                 <h1>Darson Securities Limited</h1>
                 <h2 id="printReportTitle">Commission Report</h2>
                 <p>Date: <span id="printReportDate"></span></p>
             </div>
 
-            <!-- Dashboard Page -->
             <div id="dashboardPage" class="page-container">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Commission Calculator</h2>
                 <div class="mb-6 p-4 border rounded-lg bg-indigo-50">
@@ -336,7 +393,6 @@
                 </div>
             </div>
 
-            <!-- Employees Page -->
             <div id="employeesPage" class="page-container hidden">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Employee Management</h2>
                 <form id="employeeForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
@@ -377,11 +433,9 @@
 
                 <h3 class="text-xl font-semibold mb-4">Saved Employees</h3>
                 <div id="employeeList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Employee cards will be populated here -->
-                </div>
+                    </div>
             </div>
 
-            <!-- Reports Page -->
             <div id="reportsPage" class="page-container hidden">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Reports</h2>
                 <div class="mb-6 p-4 border rounded-lg bg-gray-50">
@@ -413,11 +467,9 @@
                 <div id="monthlyReportDisplay" class="mt-6 hidden"></div>
             </div>
 
-            <!-- Balance Tracking Page -->
             <div id="balanceTrackingPage" class="page-container hidden">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Balance Tracking & Settings</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <!-- Column 1 -->
                     <div class="space-y-6">
                         <div class="p-6 bg-blue-50 rounded-lg shadow">
                             <h3 class="text-xl font-semibold text-blue-700 mb-2">Current Overall Balance</h3>
@@ -438,7 +490,6 @@
                             <p id="newMonthStatus" class="mt-2 text-sm text-gray-700"></p>
                         </div>
                     </div>
-                    <!-- Column 2 -->
                     <div class="space-y-6">
                         <div class="p-6 bg-purple-50 rounded-lg shadow">
                             <h3 class="text-xl font-semibold text-purple-700 mb-3"><i class="fas fa-database mr-2"></i>Data Backup & Restore</h3>
@@ -450,8 +501,8 @@
                         </div>
                          <div class="p-6 bg-red-50 border border-red-300 rounded-lg shadow">
                             <h3 class="text-xl font-semibold text-red-700 mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>Danger Zone</h3>
-                            <p class="text-sm text-gray-700 mb-4">Permanently erase ALL application data. This cannot be undone.</p>
-                            <button id="resetApplicationDataBtn" class="btn btn-danger"><i class="fas fa-bomb mr-2"></i>Reset All Data</button>
+                            <p class="text-sm text-gray-700 mb-4">Permanently erase ALL application data for your account. This cannot be undone.</p>
+                            <button id="resetApplicationDataBtn" class="btn btn-danger"><i class="fas fa-bomb mr-2"></i>Reset All My Data</button>
                         </div>
                     </div>
                 </div>
@@ -466,7 +517,6 @@
                 </div>
             </div>
 
-            <!-- Payment Requests Page -->
             <div id="paymentRequestsPage" class="page-container hidden">
                  <h2 class="text-2xl font-semibold mb-6 page-title">Payment Requests</h2>
                 <form id="paymentRequestForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
@@ -507,7 +557,6 @@
                 </div>
             </div>
 
-            <!-- Courier Tracking Page -->
             <div id="courierTrackingPage" class="page-container hidden">
                  <h2 class="text-2xl font-semibold mb-6 page-title">Courier Tracking</h2>
                 <form id="courierTrackingForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
@@ -560,7 +609,6 @@
                 </div>
             </div>
 
-            <!-- Branch Budget Page -->
             <div id="branchBudgetPage" class="page-container hidden">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Branch Budget Management</h2>
                  <form id="branchBudgetForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
@@ -599,23 +647,7 @@
                     </table>
                 </div>
             </div>
-
-            <!-- Authentication Modal -->
-            <div id="authModal" class="modal hidden">
-                <div class="modal-content">
-                    <h3 class="modal-title">Authentication Required</h3>
-                    <p class="text-sm text-gray-600 mb-4">Please enter credentials to proceed.</p>
-                    <div><label for="username" class="block text-sm font-medium">Username</label><input type="text" id="username" class="mt-1 w-full"></div>
-                    <div class="mt-4"><label for="password" class="block text-sm font-medium">Password</label><input type="password" id="password" class="mt-1 w-full"></div>
-                    <p id="authError" class="text-red-500 text-sm mt-2 hidden"></p>
-                    <div class="mt-6 flex justify-end space-x-3">
-                        <button id="cancelAuthBtn" class="btn btn-secondary">Cancel</button>
-                        <button id="submitAuthBtn" class="btn btn-primary">Login</button>
-                    </div>
-                </div>
-            </div>
             
-            <!-- Generic Message Modal -->
             <div id="messageModal" class="modal hidden">
                 <div class="modal-content">
                     <h3 id="messageModalTitle" class="modal-title">Notification</h3>
@@ -627,7 +659,6 @@
                 </div>
             </div>
 
-            <!-- Bill Preview Modal -->
             <div id="billPreviewModal" class="modal hidden">
                 <div class="modal-content modal-lg"> 
                     <h3 id="billPreviewModalTitle" class="modal-title">Bill Preview</h3>
@@ -640,7 +671,6 @@
                 </div>
             </div>
             
-            <!-- Employee Detail Modal -->
             <div id="employeeDetailModal" class="modal hidden">
                 <div class="modal-content modal-lg">
                     <div class="flex justify-between items-start">
@@ -653,7 +683,6 @@
                     </div>
                     
                     <div id="employeeProfileContent">
-                        <!-- Employee Info Section -->
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 border rounded-lg">
                             <div class="flex flex-col items-center md:col-span-1">
                                 <img id="modalEmployeePicture" src="https://placehold.co/150x150/e2e8f0/e2e8f0?text=." alt="Employee Picture" class="w-32 h-32 rounded-full object-cover mb-4 border-4 border-gray-200">
@@ -668,7 +697,6 @@
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                            <!-- Leave Management Section -->
                             <div>
                                  <h4 class="text-md font-semibold mb-2 pt-2">Leave Management</h4>
                                  <form id="leaveForm" class="mb-4 p-3 border rounded-lg bg-gray-50 no-print">
@@ -695,7 +723,6 @@
                                  </div>
                             </div>
 
-                            <!-- Salary History Section -->
                             <div>
                                 <h4 class="text-md font-semibold mb-2 pt-2">Salary Management</h4>
                                 <form id="salaryForm" class="mb-4 p-3 border rounded-lg bg-gray-50 no-print">
@@ -739,15 +766,12 @@
             </div>
 
 
-            <!-- Print Footer -->
             <div class="print-footer">
                 <p>Developed by Afrasiab Asghar. Visit www.nextgensites.org or Contact +923060406003</p>
             </div>
         </main>
         
-        <!-- Print Views Container -->
         <div>
-            <!-- Salary Slip Print View -->
             <div id="salarySlipPrintView" class="print-only printable-view">
                  <div class="p-8 border-2 border-black" style="font-family: Arial, sans-serif; ">
                     <header class="text-center mb-8 pb-4 border-b-2 border-black">
@@ -811,14 +835,11 @@
                 </div>
             </div>
             
-            <!-- Employee Profile Print View -->
             <div id="employeeProfilePrintView" class="print-only printable-view">
-                 <!-- Content will be injected by JS -->
-            </div>
+                 </div>
         </div>
 
 
-        <!-- Footer -->
         <footer class="bg-gray-800 text-white text-center p-4 no-print">
             <p>&copy; <span id="currentYear"></span> Darson Securities Limited. All rights reserved.</p>
             <p class="text-sm text-gray-400">Developed by Afrasiab Asghar. Visit <a href="http://www.nextgensites.org" target="_blank" class="underline hover:text-gray-200">www.nextgensites.org</a> or Contact +923060406003</p>
@@ -826,6 +847,21 @@
     </div>
 
     <script>
+        // --- FIREBASE INITIALIZATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDldg1U88lHyTj0OM9bOimIpJIM_l34hjM",
+            authDomain: "darsoncommision.firebaseapp.com",
+            databaseURL: "https://darsoncommision-default-rtdb.firebaseio.com",
+            projectId: "darsoncommision",
+            storageBucket: "darsoncommision.appspot.com", // Corrected storage bucket URL
+            messagingSenderId: "689239446260",
+            appId: "1:689239446260:web:c0922d9971e5d9457e44a1"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+
         // --- UTILITY FUNCTIONS ---
         const Utils = {
             formatDateForStorage: (date) => {
@@ -886,27 +922,51 @@
             targetDateForDashboard: Utils.getTodayDateString(), 
             dailyDataCache: {}, 
             monthlyDataCache: {}, 
-            authCallback: null, 
-            itemToDeleteType: null, 
-            itemToDeleteId: null, 
         };
 
-        const StorageService = {
-            prefix: 'darsonApp_',
-            getItem: (key) => { const item = localStorage.getItem(StorageService.prefix + key); return item ? JSON.parse(item) : null; },
-            setItem: (key, value) => localStorage.setItem(StorageService.prefix + key, JSON.stringify(value)),
-            removeItem: (key) => localStorage.removeItem(StorageService.prefix + key),
-            getAllKeysWithPrefix: (subPrefix) => {
-                const keys = [];
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key.startsWith(StorageService.prefix + subPrefix)) keys.push(key);
+        const FirebaseStorageService = {
+            _getRef: (key) => {
+                const user = auth.currentUser;
+                if (!user) throw new Error("User not authenticated for DB operation.");
+                return db.ref(`users/${user.uid}/${key}`);
+            },
+            getItem: async (key) => {
+                try {
+                    const snapshot = await FirebaseStorageService._getRef(key).once('value');
+                    return snapshot.val(); // Returns the data or null if not found
+                } catch (error) {
+                    console.error("Firebase getItem Error:", error);
+                    return null;
                 }
-                return keys;
+            },
+            setItem: (key, value) => {
+                return FirebaseStorageService._getRef(key).set(value);
+            },
+            removeItem: (key) => {
+                return FirebaseStorageService._getRef(key).remove();
+            },
+            getAllData: async () => {
+                 const user = auth.currentUser;
+                if (!user) return null;
+                const snapshot = await db.ref(`users/${user.uid}`).once('value');
+                return snapshot.val();
             },
             clearAllAppData: () => {
-                const keysToRemove = StorageService.getAllKeysWithPrefix('');
-                keysToRemove.forEach(key => localStorage.removeItem(key));
+                const user = auth.currentUser;
+                if (!user) return Promise.reject("No user logged in to clear data.");
+                return db.ref(`users/${user.uid}`).remove();
+            },
+             restoreAllData: (data) => {
+                const user = auth.currentUser;
+                if (!user) return Promise.reject("No user logged in to restore data.");
+                // The data from file has `users/UID/data` structure. We just need the `data` part.
+                const userKey = `users/${user.uid}`;
+                if (data[userKey]) {
+                    return db.ref(userKey).set(data[userKey]);
+                } else {
+                     // Fallback for older backup format or differently structured JSON
+                    return db.ref(`users/${user.uid}`).set(data);
+                }
             }
         };
         
@@ -942,7 +1002,7 @@
                 document.querySelectorAll('nav a[data-page]').forEach(link => {
                     link.addEventListener('click', (e) => {
                         e.preventDefault(); UIController.navigateTo(link.dataset.page);
-                        document.querySelectorAll('nav a[data-page]').forEach(l => l.classList.remove('active'));
+                        document.querySelectorAll('nav a[data-page], nav button').forEach(l => l.classList.remove('active'));
                         link.classList.add('active'); 
                         const navLinks = document.getElementById('navLinks');
                         if (!navLinks.classList.contains('hidden')) {
@@ -951,6 +1011,7 @@
                     });
                 });
                 document.getElementById('mobileMenuButton').addEventListener('click', () => document.getElementById('navLinks').classList.toggle('hidden'));
+                document.getElementById('logoutBtn').addEventListener('click', AuthController.signOut);
 
                 // Set dates
                 document.getElementById('dashboardDateInput').value = AppState.targetDateForDashboard; 
@@ -962,9 +1023,9 @@
                     AppState.targetDateForDashboard = document.getElementById('dashboardDateInput').value || Utils.getTodayDateString();
                     UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard);
                 });
-                document.getElementById('loadDashboardDateBtn').addEventListener('click', () => {
+                document.getElementById('loadDashboardDateBtn').addEventListener('click', async () => {
                     const selectedDate = document.getElementById('dashboardDateInput').value || Utils.getTodayDateString();
-                    UIController.loadTransactionsForDashboard(selectedDate);
+                    await UIController.loadTransactionsForDashboard(selectedDate);
                 });
                 ['quantity', 'rate'].forEach(id => document.getElementById(id).addEventListener('input', UIController.updateDashboardCommissionDisplay));
                 document.getElementById('addTransactionBtn').addEventListener('click', UIController.addTransactionToCurrentList);
@@ -979,15 +1040,36 @@
                 // Reports Page Listeners
                 document.getElementById('viewDailyReportBtn').addEventListener('click', UIController.displayDailyReport);
                 document.getElementById('printDailyReportBtn').addEventListener('click', () => UIController.printReport('daily_historical'));
-                document.getElementById('deleteDailyReportBtn').addEventListener('click', () => {
+                document.getElementById('deleteDailyReportBtn').addEventListener('click', async () => {
                      const d = document.getElementById('reportDate').value; if (!d) { Utils.showMessage('Input Required', 'Select date to delete.'); return; }
-                    UIController.requestAuthThenDelete('dailyReport', d);
+                     Utils.showConfirmationModal("Delete Report?", `Are you sure you want to delete the report for ${d}?`, async () => {
+                        await FirebaseStorageService.removeItem(`transactions/${d}`);
+                        delete AppState.dailyDataCache[d];
+                        document.getElementById('dailyReportDisplay').innerHTML = `<p class="text-green-500">Report for ${Utils.formatDateForDisplay(d)} deleted.</p>`;
+                        await BalanceTrackingController.updateOverallBalanceDisplay();
+                        Utils.showMessage('Success', 'Report deleted.');
+                     });
                 });
                 document.getElementById('viewMonthlyReportBtn').addEventListener('click', UIController.displayMonthlyReport);
                 document.getElementById('printMonthlyReportBtn').addEventListener('click', () => UIController.printReport('monthly'));
-                document.getElementById('deleteMonthlyReportBtn').addEventListener('click', () => {
+                document.getElementById('deleteMonthlyReportBtn').addEventListener('click', async () => {
                     const m = document.getElementById('reportMonth').value; if (!m) { Utils.showMessage('Input Required', 'Select month to delete.'); return; }
-                    UIController.requestAuthThenDelete('monthlyReport', m);
+                    Utils.showConfirmationModal("Delete Month's Reports?", `Delete all daily reports for ${Utils.formatMonthForDisplay(m)}? This is irreversible.`, async () => {
+                        const allTransactions = await FirebaseStorageService.getItem('transactions') || {};
+                        let c = 0;
+                        const updates = {};
+                        Object.keys(allTransactions).forEach(dateKey => {
+                            if (dateKey.startsWith(m)) {
+                                updates[`transactions/${dateKey}`] = null; // Mark for deletion
+                                c++;
+                            }
+                        });
+                        await db.ref(`users/${auth.currentUser.uid}`).update(updates); // Perform multi-path delete
+                        delete AppState.monthlyDataCache[m];
+                        document.getElementById('monthlyReportDisplay').innerHTML = `<p class="text-green-500">Data for ${Utils.formatMonthForDisplay(m)} (${c} days) deleted.</p>`;
+                        await BalanceTrackingController.updateOverallBalanceDisplay();
+                        Utils.showMessage('Success', `${c} daily reports deleted.`);
+                    });
                 });
 
                 // Balance Tracking & Settings Listeners
@@ -1021,31 +1103,26 @@
                 document.getElementById('editEmployeeFromModalBtn').addEventListener('click', EmployeeController.handleEditEmployeeFromModal);
                 document.getElementById('deleteEmployeeFromModalBtn').addEventListener('click', EmployeeController.handleDeleteEmployeeFromModal);
                 document.getElementById('printProfileFromModalBtn').addEventListener('click', EmployeeController.handlePrintProfileFromModal);
-
-
-                // Modal Listeners
-                document.getElementById('cancelAuthBtn').addEventListener('click', UIController.hideAuthModal);
-                document.getElementById('submitAuthBtn').addEventListener('click', AuthController.handleLogin);
                 
                 UIController.navigateTo('dashboard'); 
             },
 
-            navigateTo: (pageId) => {
+            navigateTo: async (pageId) => {
                 document.querySelectorAll('.page-container').forEach(page => page.classList.add('hidden'));
                 const targetPage = document.getElementById(pageId + 'Page');
                 if (targetPage) {
                     targetPage.classList.remove('hidden'); AppState.currentPage = pageId;
-                    if (pageId === 'dashboard') UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); 
-                    if (pageId === 'employees') EmployeeController.loadEmployees();
-                    if (pageId === 'balanceTracking') { BalanceTrackingController.updateOverallBalanceDisplay(); BalanceTrackingController.loadAdjustmentHistory(); }
-                    if (pageId === 'paymentRequests') PaymentRequestController.loadRequests();
-                    if (pageId === 'courierTracking') CourierTrackingController.loadEntries();
-                    if (pageId === 'branchBudget') BranchBudgetController.loadEntries();
+                    if (pageId === 'dashboard') await UIController.loadTransactionsForDashboard(AppState.targetDateForDashboard); 
+                    if (pageId === 'employees') await EmployeeController.loadEmployees();
+                    if (pageId === 'balanceTracking') { await BalanceTrackingController.updateOverallBalanceDisplay(); await BalanceTrackingController.loadAdjustmentHistory(); }
+                    if (pageId === 'paymentRequests') await PaymentRequestController.loadRequests();
+                    if (pageId === 'courierTracking') await CourierTrackingController.loadEntries();
+                    if (pageId === 'branchBudget') await BranchBudgetController.loadEntries();
                     if (pageId === 'reports') { document.getElementById('dailyReportDisplay').classList.add('hidden').innerHTML = ''; document.getElementById('monthlyReportDisplay').classList.add('hidden').innerHTML = ''; }
                 } else console.error(`Page ${pageId}Page not found.`);
             },
 
-            loadTransactionsForDashboard: (dateString) => {
+            loadTransactionsForDashboard: async (dateString) => {
                 AppState.targetDateForDashboard = dateString; 
                 document.getElementById('dashboardDateInput').value = dateString; 
                 const displayDate = Utils.formatDateForDisplay(dateString);
@@ -1053,7 +1130,7 @@
                 const dateLabel = `${displayDate} ${isToday ? '(Today)' : '(Selected Date)'}`;
                 document.getElementById('currentDateDisplay').textContent = dateLabel;
                 document.getElementById('summaryDateDisplay').textContent = displayDate;
-                const data = StorageService.getItem(`transactions_${dateString}`);
+                const data = await FirebaseStorageService.getItem(`transactions/${dateString}`);
                 if (data && data.transactions) {
                     AppState.currentTransactions = data.transactions.map(tx => ({...tx, tempId: tx.tempId || Utils.generateId()}));
                 } else {
@@ -1119,38 +1196,41 @@
                 document.getElementById('dailyFinalHouseCommission').textContent = Utils.formatCurrency(d.finalHouseCommission);
             },
 
-            saveCurrentDayTransactions: () => {
+            saveCurrentDayTransactions: async () => {
                 const targetDate = AppState.targetDateForDashboard;
                 if (AppState.currentTransactions.length === 0) {
-                    Utils.showMessage('No Transactions', `No transactions to save for ${Utils.formatDateForDisplay(targetDate)}.`); return;
+                     await FirebaseStorageService.removeItem(`transactions/${targetDate}`);
+                     Utils.showMessage('Data Cleared', `All transactions for ${Utils.formatDateForDisplay(targetDate)} have been cleared and saved.`);
+                     await BalanceTrackingController.updateOverallBalanceDisplay();
+                     return;
                 }
                 const grossCommission = AppState.currentTransactions.reduce((sum, tx) => sum + tx.totalStockCommission, 0);
                 const deductions = CommissionService.calculateDeductions(grossCommission);
                 const transactionsToSave = AppState.currentTransactions.map(tx => { const { tempId, ...rest } = tx; return { ...rest, transactionTime: tx.transactionTime || new Date().toLocaleTimeString() }; });
                 const dailyReportDataToSave = { date: targetDate, transactions: transactionsToSave, ...deductions };
-                StorageService.setItem(`transactions_${targetDate}`, dailyReportDataToSave);
-                BalanceTrackingController.updateOverallBalanceDisplay(); 
+                await FirebaseStorageService.setItem(`transactions/${targetDate}`, dailyReportDataToSave);
+                await BalanceTrackingController.updateOverallBalanceDisplay(); 
                 Utils.showMessage('Success', `Transactions for ${Utils.formatDateForDisplay(targetDate)} saved successfully.`);
             },
 
-            displayDailyReport: () => {
+            displayDailyReport: async () => {
                 const rd = document.getElementById('reportDate').value; if (!rd) { Utils.showMessage('Input Required', 'Select date.'); return; }
-                const data = StorageService.getItem(`transactions_${rd}`), displayDiv = document.getElementById('dailyReportDisplay');
+                const data = await FirebaseStorageService.getItem(`transactions/${rd}`), displayDiv = document.getElementById('dailyReportDisplay');
                 if (!data) { displayDiv.innerHTML = `<p class="text-red-500">No data for ${Utils.formatDateForDisplay(rd)}.</p>`; displayDiv.classList.remove('hidden'); return; }
                 AppState.dailyDataCache[rd] = data;
                 let html = `<h3 class="text-xl font-semibold mb-2">Daily Report for ${Utils.formatDateForDisplay(rd)}</h3><div class="overflow-x-auto"><table class="min-w-full bg-white mb-4"><thead><tr><th>Stock</th><th>Qty</th><th>Rate</th><th>Comm/S</th><th>Total Comm.</th><th>Time</th></tr></thead><tbody>`;
-                data.transactions.forEach(tx => { html += `<tr><td>${tx.stockName}</td><td>${tx.quantity}</td><td>${Utils.formatCurrency(tx.rate)}</td><td>${Utils.formatCurrency(tx.commissionPerStock)}</td><td>${Utils.formatCurrency(tx.totalStockCommission)}</td><td>${tx.transactionTime||'N/A'}</td></tr>`; });
+                (data.transactions || []).forEach(tx => { html += `<tr><td>${tx.stockName}</td><td>${tx.quantity}</td><td>${Utils.formatCurrency(tx.rate)}</td><td>${Utils.formatCurrency(tx.commissionPerStock)}</td><td>${Utils.formatCurrency(tx.totalStockCommission)}</td><td>${tx.transactionTime||'N/A'}</td></tr>`; });
                 html += `</tbody></table></div><div class="p-4 bg-gray-100 rounded"><p>Gross: <span class="font-bold">${Utils.formatCurrency(data.grossCommission)}</span></p><p>HO Deduct: <span class="font-bold">${Utils.formatCurrency(data.hoDeduction)}</span></p><p>Tax: <span class="font-bold">${Utils.formatCurrency(data.taxDeduction)}</span></p><p class="text-blue-600">Final: <span class="font-bold text-xl">${Utils.formatCurrency(data.finalHouseCommission)}</span></p></div>`;
                 displayDiv.innerHTML = html; displayDiv.classList.remove('hidden');
             },
 
-            displayMonthlyReport: () => {
+            displayMonthlyReport: async () => {
                 const rmy = document.getElementById('reportMonth').value; if (!rmy) { Utils.showMessage('Input Required', 'Select month.'); return; }
-                const keys = StorageService.getAllKeysWithPrefix('transactions_');
-                const reports = keys.map(key => StorageService.getItem(key.replace(StorageService.prefix, ''))).filter(d => d && d.date && d.date.startsWith(rmy)).sort((a,b) => new Date(a.date) - new Date(b.date));
+                const allTransactions = await FirebaseStorageService.getItem('transactions') || {};
+                const reports = Object.values(allTransactions).filter(d => d && d.date && d.date.startsWith(rmy)).sort((a,b) => new Date(a.date) - new Date(b.date));
                 const displayDiv = document.getElementById('monthlyReportDisplay');
                 if (reports.length === 0) { displayDiv.innerHTML = `<p class="text-red-500">No data for ${Utils.formatMonthForDisplay(rmy)}.</p>`; displayDiv.classList.remove('hidden'); return; }
-                let tg=0, th=0, tt=0, tf=0; reports.forEach(d => { tg+=d.grossCommission; th+=d.hoDeduction; tt+=d.taxDeduction; tf+=d.finalHouseCommission; });
+                let tg=0, th=0, tt=0, tf=0; reports.forEach(d => { tg+=d.grossCommission||0; th+=d.hoDeduction||0; tt+=d.taxDeduction||0; tf+=d.finalHouseCommission||0; });
                 AppState.monthlyDataCache[rmy] = { month: rmy, dailySummaries: reports, totalGross:tg, totalHO:th, totalTax:tt, totalFinal:tf };
                 let html = `<h3 class="text-xl font-semibold mb-2">Monthly Report for ${Utils.formatMonthForDisplay(rmy)}</h3><div class="overflow-x-auto"><table class="min-w-full bg-white mb-4"><thead><tr><th>Date</th><th>Gross</th><th>HO</th><th>Tax</th><th>Final</th></tr></thead><tbody>`;
                 reports.forEach(d => { html += `<tr><td>${Utils.formatDateForDisplay(d.date)}</td><td>${Utils.formatCurrency(d.grossCommission)}</td><td>${Utils.formatCurrency(d.hoDeduction)}</td><td>${Utils.formatCurrency(d.taxDeduction)}</td><td>${Utils.formatCurrency(d.finalHouseCommission)}</td></tr>`; });
@@ -1158,7 +1238,7 @@
                 displayDiv.innerHTML = html; displayDiv.classList.remove('hidden');
             },
             
-            printReport: (type, dataContext = null) => {
+            printReport: async (type, dataContext = null) => {
                 const titleEl = document.getElementById('printReportTitle'), dateEl = document.getElementById('printReportDate');
                 let content = '', rTitle = 'Report', rDateStr = Utils.formatDateForDisplay(Utils.getTodayDateString());
                 let printSpecificElementId = null;
@@ -1218,77 +1298,113 @@
 
                 document.body.innerHTML = printContentHtml;
                 window.print(); document.body.innerHTML = origBody; 
+                
+                // Re-initialize event listeners on the restored body
+                AuthController.addAuthEventListeners();
                 UIController.init(); 
 
                 document.querySelectorAll('nav a[data-page]').forEach(l => l.classList.remove('active'));
                 const activeLink = document.querySelector(`nav a[data-page="${AppState.currentPage}"]`);
                 if(activeLink) activeLink.classList.add('active');
                 
-                UIController.navigateTo(AppState.currentPage);
+                await UIController.navigateTo(AppState.currentPage);
 
                 if(type === 'salarySlip' || type === 'employeeProfile'){
-                    EmployeeController.showEmployeeDetailModal(dataContext.employee.id);
+                    await EmployeeController.showEmployeeDetailModal(dataContext.employee.id);
                 }
             },
-
-            showAuthModal: (callback, itemType, itemId) => {
-                AppState.authCallback = callback; AppState.itemToDeleteType = itemType; AppState.itemToDeleteId = itemId;
-                document.getElementById('username').value = ''; document.getElementById('password').value = '';
-                document.getElementById('authError').classList.add('hidden'); document.getElementById('authModal').classList.remove('hidden'); document.getElementById('username').focus();
-            },
-            hideAuthModal: () => {
-                document.getElementById('authModal').classList.add('hidden'); AppState.authCallback = null; AppState.itemToDeleteType = null; AppState.itemToDeleteId = null;
-            },
-            requestAuthThenDelete: (itemType, itemId) => {
-                UIController.showAuthModal(() => {
-                    if (itemType === 'dailyReport') { StorageService.removeItem(`transactions_${itemId}`); delete AppState.dailyDataCache[itemId]; document.getElementById('dailyReportDisplay').innerHTML = `<p class="text-green-500">Report for ${Utils.formatDateForDisplay(itemId)} deleted.</p>`; Utils.showMessage('Success', `Daily report for ${Utils.formatDateForDisplay(itemId)} deleted.`); }
-                    else if (itemType === 'monthlyReport') { const keys = StorageService.getAllKeysWithPrefix('transactions_'); let c = 0; keys.forEach(k => { if (k.startsWith(`${StorageService.prefix}transactions_${itemId}`)) { StorageService.removeItem(k.replace(StorageService.prefix, '')); c++; } }); delete AppState.monthlyDataCache[itemId]; document.getElementById('monthlyReportDisplay').innerHTML = `<p class="text-green-500">Data for ${Utils.formatMonthForDisplay(itemId)} (${c} days) deleted.</p>`; Utils.showMessage('Success', `Data for ${Utils.formatMonthForDisplay(itemId)} deleted.`); }
-                    else if (itemType === 'employee') {
-                        EmployeeController.deleteEmployee(itemId);
-                    }
-                    BalanceTrackingController.updateOverallBalanceDisplay();
-                }, itemType, itemId);
-            }
         };
 
         const AuthController = {
-            USERNAME: "DARSON", PASSWORD: "AFRASIAB", 
-            handleLogin: () => {
-                const u = document.getElementById('username').value.toUpperCase(), p = document.getElementById('password').value, errEl = document.getElementById('authError');
-                if (u === AuthController.USERNAME && p === AuthController.PASSWORD) { errEl.classList.add('hidden'); if (typeof AppState.authCallback === 'function') AppState.authCallback(); UIController.hideAuthModal(); }
-                else { errEl.textContent = 'Invalid credentials.'; errEl.classList.remove('hidden'); }
+            handleAuthStateChange: (user) => {
+                const authPage = document.getElementById('authPage');
+                const app = document.getElementById('app');
+                if (user) {
+                    // User is signed in.
+                    authPage.classList.add('hidden');
+                    app.classList.remove('hidden');
+                    app.classList.add('flex');
+                    UIController.init(); // Initialize the main app UI and logic
+                } else {
+                    // User is signed out.
+                    authPage.classList.remove('hidden');
+                    app.classList.add('hidden');
+                    app.classList.remove('flex');
+                }
+            },
+            signIn: (e) => {
+                e.preventDefault();
+                const email = document.getElementById('email-address').value;
+                const password = document.getElementById('password').value;
+                const errorEl = document.getElementById('authError');
+                errorEl.classList.add('hidden');
+
+                auth.signInWithEmailAndPassword(email, password)
+                    .catch((error) => {
+                        errorEl.textContent = error.message;
+                        errorEl.classList.remove('hidden');
+                    });
+            },
+            signUp: (e) => {
+                e.preventDefault();
+                const email = document.getElementById('signUpEmail').value;
+                const password = document.getElementById('signUpPassword').value;
+                const errorEl = document.getElementById('signUpError');
+                 errorEl.classList.add('hidden');
+
+                auth.createUserWithEmailAndPassword(email, password)
+                    .catch((error) => {
+                        errorEl.textContent = error.message;
+                        errorEl.classList.remove('hidden');
+                    });
+            },
+            signOut: () => {
+                auth.signOut();
+            },
+             toggleAuthForms: () => {
+                document.getElementById('loginForm').classList.toggle('hidden');
+                document.getElementById('signUpForm').classList.toggle('hidden');
+                document.getElementById('backToLoginDiv').classList.toggle('hidden');
+                 document.querySelector('.text-center p').classList.toggle('hidden');
+            },
+            addAuthEventListeners: () => {
+                document.getElementById('loginForm').addEventListener('submit', AuthController.signIn);
+                document.getElementById('signUpForm').addEventListener('submit', AuthController.signUp);
+                document.getElementById('showSignUp').addEventListener('click', (e) => { e.preventDefault(); AuthController.toggleAuthForms(); });
+                document.getElementById('showLogin').addEventListener('click', (e) => { e.preventDefault(); AuthController.toggleAuthForms(); });
             }
         };
         
         const DataResetService = {
             initiateFullResetProcess: () => {
-                Utils.showConfirmationModal( "Confirm Data Reset", "Are you sure you want to start the full application data reset process? This is irreversible.",
-                    () => { UIController.showAuthModal(() => { DataResetService.finalConfirmationForReset(); }, 'fullReset', null); },
+                Utils.showConfirmationModal( "Confirm Data Reset", "Are you sure you want to erase ALL of your data? This is irreversible.",
+                    () => {
+                        DataResetService.performFullReset();
+                    },
                     () => { Utils.showMessage('Cancelled', 'Data reset process cancelled.'); } 
                 );
             },
-            finalConfirmationForReset: () => {
-                Utils.showConfirmationModal( "FINAL WARNING: Erase All Data?", "All application data (transactions, reports, balances, settings, etc.) will be PERMANENTLY ERASED. This action CANNOT BE UNDONE. Are you absolutely sure you want to proceed?",
-                    () => { DataResetService.performFullReset(); }, () => { Utils.showMessage('Cancelled', 'Final data reset cancelled.'); } 
-                );
+            performFullReset: async () => {
+                try {
+                    await FirebaseStorageService.clearAllAppData();
+                    Utils.showMessage('Success', 'All your application data has been reset successfully.');
+                    // Refresh current page to reflect changes
+                    await UIController.navigateTo(AppState.currentPage);
+                } catch(error){
+                     Utils.showMessage('Error', 'Could not reset data. ' + error.message);
+                }
             },
-            performFullReset: () => {
-                StorageService.clearAllAppData(); 
-                Utils.showMessage('Success', 'All application data has been reset successfully.');
-                location.reload();
-            },
-            downloadData: () => {
-                const allData = {};
-                const keys = StorageService.getAllKeysWithPrefix('');
-                if (keys.length === 0) {
+            downloadData: async () => {
+                const allData = await FirebaseStorageService.getAllData();
+                if (!allData || Object.keys(allData).length === 0) {
                     Utils.showMessage('No Data', 'There is no data to download.');
                     return;
                 }
-                keys.forEach(key => {
-                    allData[key] = localStorage.getItem(key);
-                });
+                
+                const user = auth.currentUser;
+                const dataToSave = { [`users/${user.uid}`]: allData };
 
-                const jsonString = JSON.stringify(allData, null, 2);
+                const jsonString = JSON.stringify(dataToSave, null, 2);
                 const blob = new Blob([jsonString], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -1298,7 +1414,7 @@
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-                Utils.showMessage('Success', 'Data has been downloaded successfully.');
+                Utils.showMessage('Success', 'Your data has been downloaded successfully.');
             },
             handleRestoreData: () => {
                 const fileInput = document.getElementById('restoreDataInput');
@@ -1311,16 +1427,15 @@
                 reader.onload = (event) => {
                     try {
                         const data = JSON.parse(event.target.result);
-                        Utils.showConfirmationModal('Confirm Restore', 'Are you sure you want to restore data from this file? All current data will be overwritten.',
-                            () => {
-                                StorageService.clearAllAppData();
-                                for (const key in data) {
-                                    if(Object.prototype.hasOwnProperty.call(data, key)){
-                                        localStorage.setItem(key, data[key]);
-                                    }
+                        Utils.showConfirmationModal('Confirm Restore', 'Are you sure you want to restore data from this file? All your current data will be overwritten.',
+                            async () => {
+                                try {
+                                    await FirebaseStorageService.restoreAllData(data);
+                                    Utils.showMessage('Success', 'Data has been restored successfully. The application will now reload.');
+                                    setTimeout(() => location.reload(), 1500);
+                                } catch (error) {
+                                     Utils.showMessage('Error', 'Restore failed. ' + error.message);
                                 }
-                                Utils.showMessage('Success', 'Data has been restored successfully. The application will now reload.');
-                                setTimeout(() => location.reload(), 1500);
                             },
                             () => {
                                 fileInput.value = ''; // Reset file input
@@ -1337,30 +1452,43 @@
 
         const BalanceTrackingController = {
             SETTINGS_KEY: 'appSettings', ADJUSTMENT_HISTORY_KEY: 'balanceAdjustments',
-            getSettings: () => StorageService.getItem(BalanceTrackingController.SETTINGS_KEY) || { overallBalance: 0, lastFinalizedMonth: null },
-            saveSettings: (s) => StorageService.setItem(BalanceTrackingController.SETTINGS_KEY, s),
-            getAdjustmentHistory: () => StorageService.getItem(BalanceTrackingController.ADJUSTMENT_HISTORY_KEY) || [],
-            saveAdjustmentHistory: (h) => StorageService.setItem(BalanceTrackingController.ADJUSTMENT_HISTORY_KEY, h),
+            getSettings: async () => await FirebaseStorageService.getItem(BalanceTrackingController.SETTINGS_KEY) || { overallBalance: 0, lastFinalizedMonth: null },
+            saveSettings: (s) => FirebaseStorageService.setItem(BalanceTrackingController.SETTINGS_KEY, s),
+            getAdjustmentHistory: async () => await FirebaseStorageService.getItem(BalanceTrackingController.ADJUSTMENT_HISTORY_KEY) || [],
+            saveAdjustmentHistory: (h) => FirebaseStorageService.setItem(BalanceTrackingController.ADJUSTMENT_HISTORY_KEY, h),
 
-            updateOverallBalanceDisplay: () => {
-                let bal = 0; const keys = StorageService.getAllKeysWithPrefix('transactions_');
-                keys.forEach(key => { const d = StorageService.getItem(key.replace(StorageService.prefix, '')); if (d && d.finalHouseCommission) bal += parseFloat(d.finalHouseCommission); });
-                const adj = BalanceTrackingController.getAdjustmentHistory(); adj.forEach(a => bal += parseFloat(a.amount));
-                const s = BalanceTrackingController.getSettings(); s.overallBalance = bal; BalanceTrackingController.saveSettings(s);
+            updateOverallBalanceDisplay: async () => {
+                let bal = 0; 
+                const allTransactions = await FirebaseStorageService.getItem('transactions') || {};
+                Object.values(allTransactions).forEach(d => { if (d && d.finalHouseCommission) bal += parseFloat(d.finalHouseCommission); });
+                
+                const adjHistory = await BalanceTrackingController.getAdjustmentHistory();
+                const adj = Object.values(adjHistory); // Convert object to array
+                adj.forEach(a => bal += parseFloat(a.amount));
+                
+                const s = await BalanceTrackingController.getSettings(); 
+                s.overallBalance = bal; 
+                await BalanceTrackingController.saveSettings(s);
                 document.getElementById('currentOverallBalance').textContent = Utils.formatCurrency(s.overallBalance);
             },
-            addManualBalanceAdjustment: () => {
+            addManualBalanceAdjustment: async () => {
                 const amtIn = document.getElementById('manualCommissionAmount'), rsnIn = document.getElementById('manualCommissionReason');
                 const amt = parseFloat(amtIn.value), rsn = rsnIn.value.trim();
                 if (isNaN(amt) || amt === 0) { Utils.showMessage('Validation Error', 'Enter valid non-zero amount.'); return; }
                 if (!rsn) { Utils.showMessage('Validation Error', 'Enter reason.'); return; }
-                const adj = { id: Utils.generateId(), date: Utils.getTodayDateString(), amount: amt, reason: rsn, type: amt > 0 ? 'Credit' : 'Debit (Manual)' };
-                const hist = BalanceTrackingController.getAdjustmentHistory(); hist.unshift(adj); BalanceTrackingController.saveAdjustmentHistory(hist);
-                BalanceTrackingController.updateOverallBalanceDisplay(); BalanceTrackingController.loadAdjustmentHistory();
+                const id = Utils.generateId();
+                const adj = { id: id, date: Utils.getTodayDateString(), amount: amt, reason: rsn, type: amt > 0 ? 'Credit' : 'Debit (Manual)' };
+                await db.ref(`users/${auth.currentUser.uid}/balanceAdjustments/${id}`).set(adj);
+                
+                await BalanceTrackingController.updateOverallBalanceDisplay(); 
+                await BalanceTrackingController.loadAdjustmentHistory();
                 amtIn.value = ''; rsnIn.value = ''; Utils.showMessage('Success', 'Balance adjusted.');
             },
-            loadAdjustmentHistory: () => {
-                const hist = BalanceTrackingController.getAdjustmentHistory(), tbody = document.getElementById('balanceAdjustmentHistoryTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
+            loadAdjustmentHistory: async () => {
+                const histObj = await FirebaseStorageService.getItem('balanceAdjustments') || {};
+                const hist = Object.values(histObj).sort((a,b) => new Date(b.date) - new Date(a.date));
+                const tbody = document.getElementById('balanceAdjustmentHistoryTable').getElementsByTagName('tbody')[0]; 
+                tbody.innerHTML = '';
                 if (hist.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-3">No adjustments.</td></tr>'; return; }
                 hist.forEach(adj => {
                     const r = tbody.insertRow(); r.insertCell().textContent = Utils.formatDateForDisplay(adj.date); r.insertCell().textContent = adj.reason;
@@ -1368,79 +1496,118 @@
                     r.cells[2].classList.toggle('text-green-600', parseFloat(adj.amount) > 0); r.cells[2].classList.toggle('text-red-600', parseFloat(adj.amount) < 0);
                 });
             },
-            finalizeCurrentMonth: () => {
-                const cmy = Utils.getCurrentMonthYearString(), s = BalanceTrackingController.getSettings();
+            finalizeCurrentMonth: async () => {
+                const cmy = Utils.getCurrentMonthYearString();
+                const s = await BalanceTrackingController.getSettings();
                 if (s.lastFinalizedMonth === cmy) { Utils.showMessage('Info', `Month ${Utils.formatMonthForDisplay(cmy)} already finalized.`); return; }
-                const keys = StorageService.getAllKeysWithPrefix('transactions_'); let me = 0;
-                keys.forEach(key => { const d = StorageService.getItem(key.replace(StorageService.prefix, '')); if (d && d.date && d.date.startsWith(cmy) && d.finalHouseCommission) me += parseFloat(d.finalHouseCommission); });
-                s.lastFinalizedMonth = cmy; BalanceTrackingController.saveSettings(s);
+                
+                const allTransactions = await FirebaseStorageService.getItem('transactions') || {};
+                let me = 0;
+                Object.values(allTransactions).forEach(d => { if (d && d.date && d.date.startsWith(cmy) && d.finalHouseCommission) me += parseFloat(d.finalHouseCommission); });
+                
+                s.lastFinalizedMonth = cmy; 
+                await BalanceTrackingController.saveSettings(s);
                 const stEl = document.getElementById('newMonthStatus');
                 stEl.textContent = `Month ${Utils.formatMonthForDisplay(cmy)} finalized (Earnings: ${Utils.formatCurrency(me)}). Ready for new month.`;
-                stEl.classList.add('text-green-600'); Utils.showMessage('Month Finalized', `Month ${Utils.formatMonthForDisplay(cmy)} earnings: ${Utils.formatCurrency(me)}.`);
+                stEl.classList.add('text-green-600'); 
+                Utils.showMessage('Month Finalized', `Month ${Utils.formatMonthForDisplay(cmy)} earnings: ${Utils.formatCurrency(me)}.`);
             }
         };
 
         const PaymentRequestController = {
             STORAGE_KEY: 'paymentRequests',
-            getRequests: () => StorageService.getItem(PaymentRequestController.STORAGE_KEY) || [],
-            saveRequests: (r) => StorageService.setItem(PaymentRequestController.STORAGE_KEY, r),
+            getRequests: async () => await FirebaseStorageService.getItem(PaymentRequestController.STORAGE_KEY) || {},
+            saveRequests: (r) => FirebaseStorageService.setItem(PaymentRequestController.STORAGE_KEY, r),
 
-            handleAddRequest: (e) => {
+            handleAddRequest: async (e) => {
                 e.preventDefault(); const d = document.getElementById('paymentRequestDate').value, a = parseFloat(document.getElementById('paymentRequestAmount').value), desc = document.getElementById('paymentRequestDescription').value.trim();
                 if (!d || isNaN(a) || a <= 0 || !desc) { Utils.showMessage('Validation Error', 'Fill all fields.'); return; }
-                const nr = { id: Utils.generateId(), requestDate: d, amount: a, description: desc, status: 'Pending', entryDate: Utils.getTodayDateString() };
-                const rs = PaymentRequestController.getRequests(); rs.unshift(nr); PaymentRequestController.saveRequests(rs);
-                PaymentRequestController.loadRequests(); document.getElementById('paymentRequestForm').reset(); Utils.showMessage('Success', 'Request submitted.');
+                const id = Utils.generateId();
+                const nr = { id: id, requestDate: d, amount: a, description: desc, status: 'Pending', entryDate: Utils.getTodayDateString() };
+                await db.ref(`users/${auth.currentUser.uid}/${PaymentRequestController.STORAGE_KEY}/${id}`).set(nr);
+                await PaymentRequestController.loadRequests(); 
+                document.getElementById('paymentRequestForm').reset(); 
+                Utils.showMessage('Success', 'Request submitted.');
             },
-            loadRequests: () => {
-                const rs = PaymentRequestController.getRequests(), tbody = document.getElementById('paymentRequestsTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
+            loadRequests: async () => {
+                const rsObj = await PaymentRequestController.getRequests();
+                const rs = Object.values(rsObj).sort((a,b) => new Date(b.requestDate) - new Date(a.requestDate));
+                const tbody = document.getElementById('paymentRequestsTable').getElementsByTagName('tbody')[0]; 
+                tbody.innerHTML = '';
                 if (rs.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-3">No requests.</td></tr>'; }
                 else { rs.forEach(req => {
                         const r = tbody.insertRow(); r.insertCell().textContent = req.id.slice(-6).toUpperCase(); r.insertCell().textContent = Utils.formatDateForDisplay(req.requestDate);
                         r.insertCell().textContent = Utils.formatCurrency(req.amount); r.insertCell().textContent = req.description;
                         const sc = r.insertCell(), ss = document.createElement('select'); ss.classList.add('p-1','border','rounded-md','text-sm','bg-white','w-full');
                         ['Pending','Approved','Paid','Rejected'].forEach(s => { const o=document.createElement('option'); o.value=s; o.textContent=s; if(s===req.status)o.selected=true; ss.appendChild(o); });
-                        ss.onchange=(e)=>PaymentRequestController.updateStatus(req.id,e.target.value); sc.appendChild(ss);
+                        ss.onchange=async (e)=> await PaymentRequestController.updateStatus(req.id,e.target.value); sc.appendChild(ss);
                         const ac = r.insertCell(), delBtn = document.createElement('button'); delBtn.innerHTML='<i class="fas fa-trash-alt"></i>'; delBtn.classList.add('btn','btn-danger','btn-icon','text-xs');
                         delBtn.onclick=()=>PaymentRequestController.deleteRequest(req.id); ac.appendChild(delBtn);
                     }); }
-                PaymentRequestController.updatePaymentSummary();
+                await PaymentRequestController.updatePaymentSummary();
             },
-            updateStatus: (id, newStatus) => {
-                let requests = PaymentRequestController.getRequests(); const requestIndex = requests.findIndex(req => req.id === id); if (requestIndex === -1) { Utils.showMessage('Error', 'Payment request not found.'); return; }
-                const oldStatus = requests[requestIndex].status; requests[requestIndex].status = newStatus; PaymentRequestController.saveRequests(requests);
+            updateStatus: async (id, newStatus) => {
+                const requests = await PaymentRequestController.getRequests(); 
+                const requestToUpdate = requests[id];
+                if (!requestToUpdate) { Utils.showMessage('Error', 'Payment request not found.'); return; }
+
+                const oldStatus = requestToUpdate.status;
+                await db.ref(`users/${auth.currentUser.uid}/${PaymentRequestController.STORAGE_KEY}/${id}/status`).set(newStatus);
+
                 if (newStatus === 'Approved' && oldStatus !== 'Approved') {
-                    const approvedRequest = requests[requestIndex]; const amountToDeduct = parseFloat(approvedRequest.amount); const reason = `Approved Payment: ${approvedRequest.description.substring(0,25)} (ID: ${approvedRequest.id.slice(-6).toUpperCase()})`;
-                    const adjustmentHistory = BalanceTrackingController.getAdjustmentHistory(); const newAdjustment = { id: Utils.generateId(), date: Utils.getTodayDateString(), amount: -amountToDeduct, reason: reason, type: 'Debit (Payment Appr.)' };
-                    adjustmentHistory.unshift(newAdjustment); BalanceTrackingController.saveAdjustmentHistory(adjustmentHistory); BalanceTrackingController.updateOverallBalanceDisplay(); 
+                    const amountToDeduct = parseFloat(requestToUpdate.amount); 
+                    const reason = `Approved Payment: ${requestToUpdate.description.substring(0,25)} (ID: ${requestToUpdate.id.slice(-6).toUpperCase()})`;
+                    const adjId = Utils.generateId();
+                    const newAdjustment = { id: adjId, date: Utils.getTodayDateString(), amount: -amountToDeduct, reason: reason, type: 'Debit (Payment Appr.)' };
+                    await db.ref(`users/${auth.currentUser.uid}/balanceAdjustments/${adjId}`).set(newAdjustment);
+
+                    await BalanceTrackingController.updateOverallBalanceDisplay(); 
                     Utils.showMessage('Status & Balance Updated', `Request status: ${newStatus}. ${Utils.formatCurrency(amountToDeduct)} deducted from balance.`);
-                    if (AppState.currentPage === 'balanceTracking') BalanceTrackingController.loadAdjustmentHistory();
+                    if (AppState.currentPage === 'balanceTracking') await BalanceTrackingController.loadAdjustmentHistory();
                 } else { Utils.showMessage('Status Updated', `Request status: ${newStatus}.`); }
-                PaymentRequestController.updatePaymentSummary(); 
+                await PaymentRequestController.updatePaymentSummary(); 
             },
             deleteRequest: (id) => {
-                Utils.showConfirmationModal('Delete Request', 'Are you sure you want to delete this payment request?', () => {
-                    let rs = PaymentRequestController.getRequests(); rs = rs.filter(req => req.id !== id);
-                    PaymentRequestController.saveRequests(rs); PaymentRequestController.loadRequests(); Utils.showMessage('Deleted', 'Request deleted.');
+                Utils.showConfirmationModal('Delete Request', 'Are you sure you want to delete this payment request?', async () => {
+                    await FirebaseStorageService.removeItem(`${PaymentRequestController.STORAGE_KEY}/${id}`);
+                    await PaymentRequestController.loadRequests(); 
+                    Utils.showMessage('Deleted', 'Request deleted.');
                 });
             },
-            updatePaymentSummary: () => {
-                const rs = PaymentRequestController.getRequests(), cm = Utils.getCurrentMonthYearString();
+            updatePaymentSummary: async () => {
+                const rsObj = await PaymentRequestController.getRequests();
+                const rs = Object.values(rsObj);
+                const cm = Utils.getCurrentMonthYearString();
                 document.getElementById('paymentSummaryMonth').textContent = Utils.formatMonthForDisplay(cm);
-                let tr=0, ta=0, tp=0; rs.filter(req => req.requestDate.startsWith(cm)).forEach(req => { tr+=parseFloat(req.amount); if(req.status==='Approved'||req.status==='Paid')ta+=parseFloat(req.amount); if(req.status==='Paid')tp+=parseFloat(req.amount); });
+                let tr=0, ta=0, tp=0; 
+                rs.filter(req => req.requestDate.startsWith(cm)).forEach(req => { 
+                    tr+=parseFloat(req.amount); 
+                    if(req.status==='Approved'||req.status==='Paid') ta+=parseFloat(req.amount); 
+                    if(req.status==='Paid') tp+=parseFloat(req.amount); 
+                });
                 const ua = ta - tp;
-                document.getElementById('totalRequestedAmount').textContent=Utils.formatCurrency(tr); document.getElementById('totalApprovedAmount').textContent=Utils.formatCurrency(ta);
-                document.getElementById('totalPaidAmount').textContent=Utils.formatCurrency(tp); document.getElementById('totalUnpaidApprovedAmount').textContent=Utils.formatCurrency(ua);
+                document.getElementById('totalRequestedAmount').textContent=Utils.formatCurrency(tr); 
+                document.getElementById('totalApprovedAmount').textContent=Utils.formatCurrency(ta);
+                document.getElementById('totalPaidAmount').textContent=Utils.formatCurrency(tp); 
+                document.getElementById('totalUnpaidApprovedAmount').textContent=Utils.formatCurrency(ua);
             },
-            carryOverUnpaidApproved: () => {
-                const rs = PaymentRequestController.getRequests(), cm = Utils.getCurrentMonthYearString(); let unpaidApprovedForCarryOver = 0;
+            carryOverUnpaidApproved: async () => {
+                const rsObj = await PaymentRequestController.getRequests();
+                const rs = Object.values(rsObj);
+                const cm = Utils.getCurrentMonthYearString(); 
+                let unpaidApprovedForCarryOver = 0;
                 rs.filter(req => req.requestDate.startsWith(cm) && req.status === 'Approved').forEach(req => unpaidApprovedForCarryOver += parseFloat(req.amount));
+                
                 if (unpaidApprovedForCarryOver <= 0) { Utils.showMessage('No Amount', 'No unpaid "Approved" amounts from current month to carry over.'); return; }
-                Utils.showConfirmationModal('Carry Over Balance', `Carry over ${Utils.formatCurrency(unpaidApprovedForCarryOver)} (unpaid "Approved" from ${Utils.formatMonthForDisplay(cm)}) to balance adjustments as a negative (debit) entry? This will reflect as an expense covered.`, () => {
-                    const rsn = `Carried over unpaid approved from ${Utils.formatMonthForDisplay(cm)}`; const adjAmt = -unpaidApprovedForCarryOver; 
-                    const adj = { id: Utils.generateId(), date: Utils.getTodayDateString(), amount: adjAmt, reason: rsn, type: 'Debit (Carry Over)' };
-                    const hist = BalanceTrackingController.getAdjustmentHistory(); hist.unshift(adj); BalanceTrackingController.saveAdjustmentHistory(hist);
-                    BalanceTrackingController.updateOverallBalanceDisplay(); BalanceTrackingController.loadAdjustmentHistory();
+                
+                Utils.showConfirmationModal('Carry Over Balance', `Carry over ${Utils.formatCurrency(unpaidApprovedForCarryOver)} (unpaid "Approved" from ${Utils.formatMonthForDisplay(cm)}) to balance adjustments as a negative (debit) entry? This will reflect as an expense covered.`, async () => {
+                    const rsn = `Carried over unpaid approved from ${Utils.formatMonthForDisplay(cm)}`; 
+                    const adjAmt = -unpaidApprovedForCarryOver; 
+                    const adjId = Utils.generateId();
+                    const adj = { id: adjId, date: Utils.getTodayDateString(), amount: adjAmt, reason: rsn, type: 'Debit (Carry Over)' };
+                    await db.ref(`users/${auth.currentUser.uid}/balanceAdjustments/${adjId}`).set(adj);
+                    await BalanceTrackingController.updateOverallBalanceDisplay(); 
+                    if(AppState.currentPage === 'balanceTracking') await BalanceTrackingController.loadAdjustmentHistory();
                     Utils.showMessage('Carried Over', `${Utils.formatCurrency(unpaidApprovedForCarryOver)} adjusted in balance.`);
                 });
             }
@@ -1448,38 +1615,43 @@
         
         const CourierTrackingController = {
             STORAGE_KEY: 'courierEntries',
-            getEntries: () => StorageService.getItem(CourierTrackingController.STORAGE_KEY) || [],
-            saveEntries: (e) => StorageService.setItem(CourierTrackingController.STORAGE_KEY, e),
+            getEntries: async () => await FirebaseStorageService.getItem(CourierTrackingController.STORAGE_KEY) || {},
+            saveEntries: (e) => FirebaseStorageService.setItem(CourierTrackingController.STORAGE_KEY, e),
 
-            handleAddEntry: (e) => {
+            handleAddEntry: async (e) => {
                 e.preventDefault(); const typ = document.getElementById('courierType').value, dt = document.getElementById('courierDateSent').value, tid = document.getElementById('courierTrackingId').value.trim(),
                 sn = document.getElementById('courierSenderName').value.trim(), rn = document.getElementById('courierReceiverName').value.trim(), dst = document.getElementById('courierDestination').value.trim(),
                 st = document.getElementById('courierStatus').value.trim(), dsc = document.getElementById('courierDescription').value.trim();
                 if (!dt||!sn||!rn||!dst||!st) { Utils.showMessage('Validation Error', 'Fill required courier fields.'); return; }
-                const ne = { id:Utils.generateId(),type:typ,date:dt,trackingId:tid,senderName:sn,receiverName:rn,destination:dst,status:st,description:dsc,entryDate:Utils.getTodayDateString() };
-                const es = CourierTrackingController.getEntries(); es.unshift(ne); CourierTrackingController.saveEntries(es);
-                CourierTrackingController.loadEntries(); document.getElementById('courierTrackingForm').reset(); Utils.showMessage('Success', 'Courier entry added.');
+                const id = Utils.generateId();
+                const ne = { id:id,type:typ,date:dt,trackingId:tid,senderName:sn,receiverName:rn,destination:dst,status:st,description:dsc,entryDate:Utils.getTodayDateString() };
+                await db.ref(`users/${auth.currentUser.uid}/${CourierTrackingController.STORAGE_KEY}/${id}`).set(ne);
+                await CourierTrackingController.loadEntries(); 
+                document.getElementById('courierTrackingForm').reset(); Utils.showMessage('Success', 'Courier entry added.');
             },
-            loadEntries: () => {
-                const es = CourierTrackingController.getEntries(), tbody = document.getElementById('courierTrackingTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
+            loadEntries: async () => {
+                const esObj = await CourierTrackingController.getEntries();
+                const es = Object.values(esObj).sort((a,b) => new Date(b.date) - new Date(a.date));
+                const tbody = document.getElementById('courierTrackingTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
                 if (es.length === 0) { tbody.innerHTML = '<tr><td colspan="10" class="text-center text-gray-500 py-3">No courier records.</td></tr>'; return; }
                 es.forEach(en => {
                     const r = tbody.insertRow(); r.insertCell().textContent = en.id.slice(-6).toUpperCase(); r.insertCell().textContent = en.type.charAt(0).toUpperCase()+en.type.slice(1);
                     r.insertCell().textContent = Utils.formatDateForDisplay(en.date); r.insertCell().textContent = en.trackingId||'N/A'; r.insertCell().textContent = en.senderName;
                     r.insertCell().textContent = en.receiverName; r.insertCell().textContent = en.destination; r.insertCell().textContent = en.description||'N/A';
                     const sc = r.insertCell(), si = document.createElement('input'); si.type='text'; si.value=en.status; si.classList.add('p-1','border','rounded-md','text-sm','w-full','bg-white');
-                    si.onchange=(e)=>CourierTrackingController.updateStatus(en.id,e.target.value); sc.appendChild(si);
+                    si.onchange= (e) => CourierTrackingController.updateStatus(en.id,e.target.value); sc.appendChild(si);
                     const ac = r.insertCell(), delBtn = document.createElement('button'); delBtn.innerHTML='<i class="fas fa-trash-alt"></i>'; delBtn.classList.add('btn','btn-danger','btn-icon','text-xs');
                     delBtn.onclick=()=>CourierTrackingController.deleteEntry(en.id); ac.appendChild(delBtn);
                 });
             },
             updateStatus: (id, newStatus) => {
-                let es = CourierTrackingController.getEntries(); es = es.map(e => e.id === id ? { ...e, status: newStatus } : e); CourierTrackingController.saveEntries(es);
+                db.ref(`users/${auth.currentUser.uid}/${CourierTrackingController.STORAGE_KEY}/${id}/status`).set(newStatus);
             },
             deleteEntry: (id) => {
-                 Utils.showConfirmationModal('Delete Courier Entry', 'Are you sure you want to delete this courier entry?', () => {
-                    let es = CourierTrackingController.getEntries(); es = es.filter(e => e.id !== id); CourierTrackingController.saveEntries(es);
-                    CourierTrackingController.loadEntries(); Utils.showMessage('Deleted', 'Courier entry deleted.');
+                 Utils.showConfirmationModal('Delete Courier Entry', 'Are you sure you want to delete this courier entry?', async () => {
+                    await FirebaseStorageService.removeItem(`${CourierTrackingController.STORAGE_KEY}/${id}`);
+                    await CourierTrackingController.loadEntries(); 
+                    Utils.showMessage('Deleted', 'Courier entry deleted.');
                 });
             }
         };
@@ -1488,8 +1660,7 @@
             STORAGE_KEY: 'branchBudgetEntries', 
             tempBillImagesBase64: [], 
 
-            getEntries: () => StorageService.getItem(BranchBudgetController.STORAGE_KEY) || [],
-            saveEntries: (e) => StorageService.setItem(BranchBudgetController.STORAGE_KEY, e),
+            getEntries: async () => await FirebaseStorageService.getItem(BranchBudgetController.STORAGE_KEY) || {},
 
             previewBillImages: (ev) => { 
                 BranchBudgetController.tempBillImagesBase64 = [];
@@ -1511,19 +1682,23 @@
                 } else { previewsContainer.classList.add('hidden'); }
             },
 
-            handleAddEntry: (e) => {
+            handleAddEntry: async (e) => {
                 e.preventDefault(); 
                 const dt = document.getElementById('budgetEntryDate').value, itm = document.getElementById('budgetItem').value.trim(), amt = parseFloat(document.getElementById('budgetAmount').value);
                 if (!dt||!itm||isNaN(amt)||amt<=0) { Utils.showMessage('Validation Error', 'Fill Date, Item, and Amount.'); return; }
-                const ne = { id:Utils.generateId(), date:dt, item:itm, amount:amt, billImagesBase64: BranchBudgetController.tempBillImagesBase64, entryDate:Utils.getTodayDateString() };
-                const es = BranchBudgetController.getEntries(); es.unshift(ne); BranchBudgetController.saveEntries(es); BranchBudgetController.loadEntries();
+                const id = Utils.generateId();
+                const ne = { id:id, date:dt, item:itm, amount:amt, billImagesBase64: BranchBudgetController.tempBillImagesBase64, entryDate:Utils.getTodayDateString() };
+                await db.ref(`users/${auth.currentUser.uid}/${BranchBudgetController.STORAGE_KEY}/${id}`).set(ne);
+                await BranchBudgetController.loadEntries();
                 document.getElementById('branchBudgetForm').reset(); document.getElementById('billImagePreviewsContainer').innerHTML = ''; 
                 document.getElementById('billImagePreviewsContainer').classList.add('hidden'); BranchBudgetController.tempBillImagesBase64 = []; 
                 Utils.showMessage('Success', 'Budget entry added.');
             },
 
-            loadEntries: () => {
-                const es = BranchBudgetController.getEntries(), tbody = document.getElementById('branchBudgetTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
+            loadEntries: async () => {
+                const esObj = await BranchBudgetController.getEntries();
+                const es = Object.values(esObj).sort((a,b) => new Date(b.date) - new Date(a.date));
+                const tbody = document.getElementById('branchBudgetTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
                 if (es.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-3">No budget entries.</td></tr>'; return; }
                 es.forEach(en => {
                     const r = tbody.insertRow(); r.insertCell().textContent = en.id.slice(-6).toUpperCase(); r.insertCell().textContent = Utils.formatDateForDisplay(en.date);
@@ -1541,9 +1716,10 @@
             },
 
             deleteEntry: (id) => {
-                Utils.showConfirmationModal('Delete Budget Entry', 'Are you sure you want to delete this budget entry?', () => {
-                    let es = BranchBudgetController.getEntries(); es = es.filter(e => e.id !== id); BranchBudgetController.saveEntries(es);
-                    BranchBudgetController.loadEntries(); Utils.showMessage('Deleted', 'Budget entry deleted.');
+                Utils.showConfirmationModal('Delete Budget Entry', 'Are you sure you want to delete this budget entry?', async () => {
+                    await FirebaseStorageService.removeItem(`${BranchBudgetController.STORAGE_KEY}/${id}`);
+                    await BranchBudgetController.loadEntries(); 
+                    Utils.showMessage('Deleted', 'Budget entry deleted.');
                 });
             },
 
@@ -1598,13 +1774,12 @@
             }
         };
 
-        // --- EMPLOYEE CONTROLLER (FINAL) ---
         const EmployeeController = {
             STORAGE_KEY: 'employees',
             tempPictureBase64: null,
 
-            getEmployees: () => StorageService.getItem(EmployeeController.STORAGE_KEY) || [],
-            saveEmployees: (employees) => StorageService.setItem(EmployeeController.STORAGE_KEY, employees),
+            getEmployees: async () => await FirebaseStorageService.getItem(EmployeeController.STORAGE_KEY) || {},
+            saveEmployees: (employees) => FirebaseStorageService.setItem(EmployeeController.STORAGE_KEY, employees),
             
             clearForm: () => {
                 document.getElementById('employeeForm').reset();
@@ -1625,7 +1800,7 @@
                 }
             },
             
-            handleAddOrUpdateEmployee: (e) => {
+            handleAddOrUpdateEmployee: async (e) => {
                 e.preventDefault();
                 const id = document.getElementById('employeeId').value;
                 const employeeData = {
@@ -1641,31 +1816,28 @@
                     return;
                 }
 
-                let employees = EmployeeController.getEmployees();
                 if (id) { // Update existing employee
-                    const index = employees.findIndex(emp => emp.id === id);
-                    if (index > -1) {
-                        employees[index] = { ...employees[index], ...employeeData };
-                        if (EmployeeController.tempPictureBase64) {
-                            employees[index].pictureBase64 = EmployeeController.tempPictureBase64;
-                        }
+                     if (EmployeeController.tempPictureBase64) {
+                        employeeData.pictureBase64 = EmployeeController.tempPictureBase64;
                     }
+                    await db.ref(`users/${auth.currentUser.uid}/${EmployeeController.STORAGE_KEY}/${id}`).update(employeeData);
                 } else { // Add new employee
-                    employeeData.id = Utils.generateId();
+                    const newId = Utils.generateId();
+                    employeeData.id = newId;
                     employeeData.pictureBase64 = EmployeeController.tempPictureBase64;
-                    employeeData.salaries = [];
-                    employeeData.leaves = [];
-                    employees.unshift(employeeData);
+                    employeeData.salaries = {};
+                    employeeData.leaves = {};
+                    await db.ref(`users/${auth.currentUser.uid}/${EmployeeController.STORAGE_KEY}/${newId}`).set(employeeData);
                 }
 
-                EmployeeController.saveEmployees(employees);
-                EmployeeController.loadEmployees();
+                await EmployeeController.loadEmployees();
                 EmployeeController.clearForm();
                 Utils.showMessage('Success', `Employee ${id ? 'updated' : 'saved'} successfully.`);
             },
             
-            loadEmployees: () => {
-                const employees = EmployeeController.getEmployees();
+            loadEmployees: async () => {
+                const employeesObj = await EmployeeController.getEmployees();
+                const employees = Object.values(employeesObj);
                 const listContainer = document.getElementById('employeeList');
                 listContainer.innerHTML = '';
                 if (employees.length === 0) {
@@ -1686,9 +1858,9 @@
                 });
             },
 
-            showEmployeeDetailModal: (id) => {
-                const employees = EmployeeController.getEmployees();
-                const employee = employees.find(emp => emp.id === id);
+            showEmployeeDetailModal: async (id) => {
+                const employees = await EmployeeController.getEmployees();
+                const employee = employees[id];
                 if (!employee) return;
                 
                 // Populate Profile
@@ -1719,10 +1891,10 @@
                 document.getElementById('employeeDetailModal').classList.add('hidden');
             },
             
-            handleEditEmployeeFromModal: (e) => {
+            handleEditEmployeeFromModal: async (e) => {
                 const id = e.currentTarget.dataset.employeeId;
-                const employees = EmployeeController.getEmployees();
-                const employee = employees.find(emp => emp.id === id);
+                const employees = await EmployeeController.getEmployees();
+                const employee = employees[id];
                 if (!employee) return;
                 
                 document.getElementById('employeeId').value = employee.id;
@@ -1739,37 +1911,36 @@
 
             handleDeleteEmployeeFromModal: (e) => {
                 const id = e.currentTarget.dataset.employeeId;
-                Utils.showConfirmationModal('Delete Employee?', 'Are you sure you want to delete this employee and all their records? This cannot be undone.', () => {
-                    UIController.requestAuthThenDelete('employee', id);
+                Utils.showConfirmationModal('Delete Employee?', 'Are you sure you want to delete this employee and all their records? This cannot be undone.', async () => {
+                    await EmployeeController.deleteEmployee(id);
                 });
             },
 
-             handlePrintProfileFromModal: (e) => {
+             handlePrintProfileFromModal: async (e) => {
                 const id = e.currentTarget.dataset.employeeId;
-                const employees = EmployeeController.getEmployees();
-                const employee = employees.find(emp => emp.id === id);
+                const employees = await EmployeeController.getEmployees();
+                const employee = employees[id];
                 if(employee) {
-                    UIController.printReport('employeeProfile', { employee });
+                    await UIController.printReport('employeeProfile', { employee });
                 }
             },
 
-            deleteEmployee: (id) => {
-                let employees = EmployeeController.getEmployees();
-                employees = employees.filter(emp => emp.id !== id);
-                EmployeeController.saveEmployees(employees);
+            deleteEmployee: async (id) => {
+                await FirebaseStorageService.removeItem(`${EmployeeController.STORAGE_KEY}/${id}`);
                 EmployeeController.hideEmployeeDetailModal();
-                EmployeeController.loadEmployees();
+                await EmployeeController.loadEmployees();
                 Utils.showMessage('Success', 'Employee has been deleted.');
             },
 
             renderSalaryHistory: (employee) => {
                 const tbody = document.getElementById('salaryHistoryTable').getElementsByTagName('tbody')[0];
                 tbody.innerHTML = '';
-                if (!employee.salaries || employee.salaries.length === 0) {
+                const salaries = employee.salaries ? Object.values(employee.salaries) : [];
+                if (salaries.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-3">No salary records.</td></tr>';
                     return;
                 }
-                const sortedSalaries = [...employee.salaries].sort((a, b) => b.month.localeCompare(a.month));
+                const sortedSalaries = salaries.sort((a, b) => b.month.localeCompare(a.month));
 
                 sortedSalaries.forEach(salary => {
                     const row = tbody.insertRow();
@@ -1797,7 +1968,7 @@
                 });
             },
 
-            handleAddSalaryRecord: (e) => {
+            handleAddSalaryRecord: async (e) => {
                 e.preventDefault();
                 const employeeId = document.getElementById('salaryEmployeeId').value;
                 const month = document.getElementById('salaryMonth').value;
@@ -1808,35 +1979,20 @@
                 if (!month || (amount + allowances + incentives) <= 0) {
                     Utils.showMessage('Validation Error', 'Please select a month and enter a valid salary amount.'); return;
                 }
-
-                let employees = EmployeeController.getEmployees();
-                const empIndex = employees.findIndex(emp => emp.id === employeeId);
-                if (empIndex > -1) {
-                    if (!employees[empIndex].salaries) employees[empIndex].salaries = [];
-                    if (employees[empIndex].salaries.some(s => s.month === month)) {
-                        Utils.showMessage('Error', `A salary record for ${Utils.formatMonthForDisplay(month)} already exists.`); return;
-                    }
-                    employees[empIndex].salaries.push({ month, amount, allowances, incentives, status: 'Unpaid' });
-                    EmployeeController.saveEmployees(employees);
-                    EmployeeController.renderSalaryHistory(employees[empIndex]);
-                    document.getElementById('salaryForm').reset();
-                    document.getElementById('salaryMonth').value = Utils.getCurrentMonthYearString();
-                }
+                const newSalaryRecord = { month, amount, allowances, incentives, status: 'Unpaid' };
+                await db.ref(`users/${auth.currentUser.uid}/${EmployeeController.STORAGE_KEY}/${employeeId}/salaries/${month}`).set(newSalaryRecord);
+                
+                const updatedEmployee = (await EmployeeController.getEmployees())[employeeId];
+                EmployeeController.renderSalaryHistory(updatedEmployee);
+                document.getElementById('salaryForm').reset();
+                document.getElementById('salaryMonth').value = Utils.getCurrentMonthYearString();
             },
 
             updateSalaryStatus: (employeeId, month, newStatus) => {
-                let employees = EmployeeController.getEmployees();
-                const empIndex = employees.findIndex(emp => emp.id === employeeId);
-                if (empIndex > -1) {
-                    const salaryIndex = employees[empIndex].salaries.findIndex(s => s.month === month);
-                    if (salaryIndex > -1) {
-                        employees[empIndex].salaries[salaryIndex].status = newStatus;
-                        EmployeeController.saveEmployees(employees);
-                    }
-                }
+                 db.ref(`users/${auth.currentUser.uid}/${EmployeeController.STORAGE_KEY}/${employeeId}/salaries/${month}/status`).set(newStatus);
             },
             
-            printSalarySlip: (employee, salary) => {
+            printSalarySlip: async (employee, salary) => {
                 const netSalary = (salary.amount || 0) + (salary.allowances || 0) + (salary.incentives || 0);
                 document.getElementById('slipEmployeeName').textContent = employee.name;
                 document.getElementById('slipEmployeeDesignation').textContent = employee.designation;
@@ -1849,13 +2005,14 @@
                 document.getElementById('slipIncentives').textContent = parseFloat(salary.incentives || 0).toFixed(2);
                 document.getElementById('slipNetSalary').textContent = parseFloat(netSalary).toFixed(2);
                 
-                 UIController.printReport('salarySlip', { employee: employee, salary: salary });
+                 await UIController.printReport('salarySlip', { employee: employee, salary: salary });
             },
 
             populateProfilePrintView: (employee) => {
+                const salaries = employee.salaries ? Object.values(employee.salaries) : [];
                 let salaryHistoryHtml = '<tr><td colspan="3" class="text-center">No salary history.</td></tr>';
-                if(employee.salaries && employee.salaries.length > 0) {
-                    salaryHistoryHtml = [...employee.salaries].sort((a,b) => b.month.localeCompare(a.month)).map(s => `
+                if(salaries.length > 0) {
+                    salaryHistoryHtml = salaries.sort((a,b) => b.month.localeCompare(a.month)).map(s => `
                         <tr>
                             <td>${Utils.formatMonthForDisplay(s.month)}</td>
                             <td>${Utils.formatCurrency((s.amount || 0) + (s.allowances || 0) + (s.incentives || 0))}</td>
@@ -1864,9 +2021,10 @@
                     `).join('');
                 }
 
+                const leaves = employee.leaves ? Object.values(employee.leaves) : [];
                 let leaveHistoryHtml = '<tr><td colspan="2" class="text-center">No leave history.</td></tr>';
-                if(employee.leaves && employee.leaves.length > 0) {
-                     leaveHistoryHtml = [...employee.leaves].sort((a,b) => b.month.localeCompare(a.month)).map(l => `
+                if(leaves.length > 0) {
+                     leaveHistoryHtml = leaves.sort((a,b) => b.month.localeCompare(a.month)).map(l => `
                         <tr>
                             <td>${Utils.formatMonthForDisplay(l.month)}</td>
                             <td>${l.count}</td>
@@ -1914,11 +2072,12 @@
             renderLeaveHistory: (employee) => {
                 const tbody = document.getElementById('leaveHistoryTable').getElementsByTagName('tbody')[0];
                 tbody.innerHTML = '';
-                if (!employee.leaves || employee.leaves.length === 0) {
+                const leaves = employee.leaves ? Object.values(employee.leaves) : [];
+                if (leaves.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="2" class="text-center text-gray-500 py-3">No leave records.</td></tr>';
                     return;
                 }
-                const sortedLeaves = [...employee.leaves].sort((a, b) => b.month.localeCompare(a.month));
+                const sortedLeaves = leaves.sort((a, b) => b.month.localeCompare(a.month));
                 sortedLeaves.forEach(leave => {
                     const row = tbody.insertRow();
                     row.insertCell().textContent = Utils.formatMonthForDisplay(leave.month);
@@ -1926,7 +2085,7 @@
                 });
             },
 
-            handleAddLeaveRecord: (e) => {
+            handleAddLeaveRecord: async (e) => {
                 e.preventDefault();
                 const employeeId = document.getElementById('leaveEmployeeId').value;
                 const month = document.getElementById('leaveMonth').value;
@@ -1936,25 +2095,19 @@
                     Utils.showMessage('Validation Error', 'Please select a month and enter a valid number of leaves.'); return;
                 }
 
-                let employees = EmployeeController.getEmployees();
-                const empIndex = employees.findIndex(emp => emp.id === employeeId);
-                if (empIndex > -1) {
-                    if (!employees[empIndex].leaves) employees[empIndex].leaves = [];
-                    const leaveIndex = employees[empIndex].leaves.findIndex(l => l.month === month);
-                    if (leaveIndex > -1) {
-                         employees[empIndex].leaves[leaveIndex].count = count; // Update if exists
-                    } else {
-                        employees[empIndex].leaves.push({ month, count });
-                    }
-                    EmployeeController.saveEmployees(employees);
-                    EmployeeController.renderLeaveHistory(employees[empIndex]);
-                    document.getElementById('leaveForm').reset();
-                    document.getElementById('leaveMonth').value = Utils.getCurrentMonthYearString();
-                }
+                await db.ref(`users/${auth.currentUser.uid}/${EmployeeController.STORAGE_KEY}/${employeeId}/leaves/${month}`).set({ month, count });
+                const updatedEmployee = (await EmployeeController.getEmployees())[employeeId];
+                EmployeeController.renderLeaveHistory(updatedEmployee);
+                document.getElementById('leaveForm').reset();
+                document.getElementById('leaveMonth').value = Utils.getCurrentMonthYearString();
             },
         };
 
-        document.addEventListener('DOMContentLoaded', UIController.init);
+        // --- APP INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+             auth.onAuthStateChanged(AuthController.handleAuthStateChange);
+             AuthController.addAuthEventListeners();
+        });
     </script>
 </body>
 </html>
