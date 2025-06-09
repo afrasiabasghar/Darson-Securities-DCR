@@ -6,9 +6,12 @@
     <title>Darson Securities Commission Software</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
+    <!-- Image Compression Library -->
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
     <style>
         /* Custom scrollbar for better aesthetics */
         ::-webkit-scrollbar {
@@ -242,6 +245,7 @@
 </head>
 <body class="bg-gray-100">
 
+    <!-- Authentication Page -->
     <div id="authPage" class="flex items-center justify-center min-h-screen">
         <div class="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-lg">
             <div>
@@ -298,7 +302,9 @@
     </div>
 
 
+    <!-- Main App Wrapper (Initially Hidden) -->
     <div id="app" class="hidden flex-col min-h-screen">
+        <!-- Navigation -->
         <nav id="sidebar" class="p-4 shadow-md">
             <div class="container mx-auto flex flex-wrap items-center justify-between">
                 <div class="text-2xl font-bold">Darson Securities</div>
@@ -318,13 +324,16 @@
             </div>
         </nav>
 
+        <!-- Main Content Area -->
         <main class="container mx-auto p-4 flex-grow">
+            <!-- Print Header (for all printable sections) -->
             <div class="print-header">
                 <h1>Darson Securities Limited</h1>
                 <h2 id="printReportTitle">Commission Report</h2>
                 <p>Date: <span id="printReportDate"></span></p>
             </div>
 
+            <!-- Dashboard Page -->
             <div id="dashboardPage" class="page-container">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Commission Calculator</h2>
                 <div class="mb-6 p-4 border rounded-lg bg-indigo-50">
@@ -334,7 +343,7 @@
                             <label for="dashboardDateInput" class="block text-sm font-medium text-gray-700">Transaction Date:</label>
                             <input type="date" id="dashboardDateInput" class="mt-1 p-2 border rounded-md w-full">
                         </div>
-                        <button id="loadDashboardDateBtn" class="btn btn-primary w-full sm:w-auto"><i class="fas fa-calendar-day mr-2"></i>Load/Refresh for Selected Date</button>
+                        <button id="loadDashboardDateBtn" class="btn btn-primary w-full sm:w-auto"><i class="fas fa-calendar-day mr-2"></i>Load/Refresh</button>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -361,7 +370,7 @@
                         <p id="totalStockCommission" class="mt-1 p-2 bg-gray-100 rounded-md">PKR 0.00</p>
                     </div>
                     <div class="flex items-end">
-                        <button id="addTransactionBtn" class="btn btn-primary w-full"><i class="fas fa-plus-circle mr-2"></i>Add Transaction to List</button>
+                        <button id="addTransactionBtn" class="btn btn-primary w-full"><i class="fas fa-plus-circle mr-2"></i>Add Transaction</button>
                     </div>
                 </div>
                 <h3 class="text-xl font-semibold mb-4 mt-8">Transactions for <span id="currentDateDisplay"></span></h3>
@@ -388,11 +397,12 @@
                     <p class="text-blue-600">Final House Commission: <span id="dailyFinalHouseCommission" class="font-bold text-xl">PKR 0.00</span></p>
                 </div>
                 <div class="mt-6 flex justify-end space-x-3">
-                    <button id="saveDayTransactionsBtn" class="btn btn-primary"><i class="fas fa-save mr-2"></i>Save Transactions for Selected Date</button>
-                    <button id="printDayTransactionsBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Report for Selected Date</button>
+                    <button id="saveDayTransactionsBtn" class="btn btn-primary"><i class="fas fa-save mr-2"></i>Save Transactions</button>
+                    <button id="printDayTransactionsBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Report</button>
                 </div>
             </div>
 
+            <!-- Employees Page -->
             <div id="employeesPage" class="page-container hidden">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Employee Management</h2>
                 <form id="employeeForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
@@ -433,9 +443,11 @@
 
                 <h3 class="text-xl font-semibold mb-4">Saved Employees</h3>
                 <div id="employeeList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    </div>
+                    <!-- Employee cards will be populated here -->
+                </div>
             </div>
 
+            <!-- Reports Page -->
             <div id="reportsPage" class="page-container hidden">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Reports</h2>
                 <div class="mb-6 p-4 border rounded-lg bg-gray-50">
@@ -467,33 +479,36 @@
                 <div id="monthlyReportDisplay" class="mt-6 hidden"></div>
             </div>
 
+            <!-- Balance Tracking Page -->
             <div id="balanceTrackingPage" class="page-container hidden">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Balance Tracking & Settings</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Column 1 -->
                     <div class="space-y-6">
                         <div class="p-6 bg-blue-50 rounded-lg shadow">
-                            <h3 class="text-xl font-semibold text-blue-700 mb-2">Current Overall Balance</h3>
+                            <h3 class="text-xl font-semibold text-blue-700 mb-2">Overall Balance</h3>
                             <p id="currentOverallBalance" class="text-3xl font-bold text-blue-800">PKR 0.00</p>
                         </div>
                         <div class="p-6 bg-green-50 rounded-lg shadow">
                             <h3 class="text-xl font-semibold text-green-700 mb-2">Manual Balance Adjustment</h3>
-                             <label for="manualCommissionAmount" class="block text-sm font-medium text-gray-700">Amount to Add/Subtract:</label>
+                             <label for="manualCommissionAmount" class="block text-sm font-medium text-gray-700">Add/Subtract Amount:</label>
                             <input type="number" id="manualCommissionAmount" step="0.01" class="mt-1 mb-2 p-2 border rounded-md w-full" placeholder="Enter amount (e.g., 1000 or -500)">
                             <label for="manualCommissionReason" class="block text-sm font-medium text-gray-700">Reason:</label>
-                            <input type="text" id="manualCommissionReason" class="mt-1 mb-3 p-2 border rounded-md w-full" placeholder="e.g., Previous month carry-over">
+                            <input type="text" id="manualCommissionReason" class="mt-1 mb-3 p-2 border rounded-md w-full" placeholder="e.g., Previous month's balance">
                             <button id="addManualCommissionBtn" class="btn btn-primary w-full"><i class="fas fa-plus-circle mr-2"></i>Adjust Balance</button>
                         </div>
                         <div class="p-6 bg-yellow-50 rounded-lg shadow">
-                            <h3 class="text-xl font-semibold text-yellow-800 mb-3">Month End Operations</h3>
-                            <p class="text-sm text-gray-600 mb-3">Finalize the current month's earnings.</p>
+                            <h3 class="text-xl font-semibold text-yellow-800 mb-3">End of Month Operations</h3>
+                            <p class="text-sm text-gray-600 mb-3">Finalize the earnings for the current month.</p>
                             <button id="newMonthBtn" class="btn btn-primary"><i class="fas fa-calendar-check mr-2"></i>Finalize Current Month</button>
                             <p id="newMonthStatus" class="mt-2 text-sm text-gray-700"></p>
                         </div>
                     </div>
+                    <!-- Column 2 -->
                     <div class="space-y-6">
                         <div class="p-6 bg-purple-50 rounded-lg shadow">
                             <h3 class="text-xl font-semibold text-purple-700 mb-3"><i class="fas fa-database mr-2"></i>Data Backup & Restore</h3>
-                            <p class="text-sm text-gray-600 mb-4">Download all your application data into a single file for backup.</p>
+                            <p class="text-sm text-gray-600 mb-4">Download all your application data into a file for backup.</p>
                             <button id="downloadDataBtn" class="btn btn-primary w-full mb-4"><i class="fas fa-download mr-2"></i>Download Data</button>
                             <p class="text-sm text-gray-600 mb-2">Restore data from a previously downloaded backup file. This will overwrite all current data.</p>
                             <input type="file" id="restoreDataInput" accept=".json" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200">
@@ -501,7 +516,7 @@
                         </div>
                          <div class="p-6 bg-red-50 border border-red-300 rounded-lg shadow">
                             <h3 class="text-xl font-semibold text-red-700 mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>Danger Zone</h3>
-                            <p class="text-sm text-gray-700 mb-4">Permanently erase ALL application data for your account. This cannot be undone.</p>
+                            <p class="text-sm text-gray-700 mb-4">Permanently delete all application data for your account. This action cannot be undone.</p>
                             <button id="resetApplicationDataBtn" class="btn btn-danger"><i class="fas fa-bomb mr-2"></i>Reset All My Data</button>
                         </div>
                     </div>
@@ -517,6 +532,7 @@
                 </div>
             </div>
 
+            <!-- Payment Requests Page -->
             <div id="paymentRequestsPage" class="page-container hidden">
                  <h2 class="text-2xl font-semibold mb-6 page-title">Payment Requests</h2>
                 <form id="paymentRequestForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
@@ -557,6 +573,7 @@
                 </div>
             </div>
 
+            <!-- Courier Tracking Page -->
             <div id="courierTrackingPage" class="page-container hidden">
                  <h2 class="text-2xl font-semibold mb-6 page-title">Courier Tracking</h2>
                 <form id="courierTrackingForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
@@ -609,6 +626,7 @@
                 </div>
             </div>
 
+            <!-- Branch Budget Page -->
             <div id="branchBudgetPage" class="page-container hidden">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Branch Budget Management</h2>
                  <form id="branchBudgetForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
@@ -619,7 +637,7 @@
                             <input type="date" id="budgetEntryDate" class="mt-1 w-full" required>
                         </div>
                         <div>
-                            <label for="budgetItem" class="block text-sm font-medium">Item/Expense Description</label>
+                            <label for="budgetItem" class="block text-sm font-medium">Item/Expense Details</label>
                             <input type="text" id="budgetItem" class="mt-1 w-full" required>
                         </div>
                         <div>
@@ -648,6 +666,7 @@
                 </div>
             </div>
             
+            <!-- Generic Message Modal -->
             <div id="messageModal" class="modal hidden">
                 <div class="modal-content">
                     <h3 id="messageModalTitle" class="modal-title">Notification</h3>
@@ -659,6 +678,7 @@
                 </div>
             </div>
 
+            <!-- Bill Preview Modal -->
             <div id="billPreviewModal" class="modal hidden">
                 <div class="modal-content modal-lg"> 
                     <h3 id="billPreviewModalTitle" class="modal-title">Bill Preview</h3>
@@ -671,6 +691,7 @@
                 </div>
             </div>
             
+            <!-- Employee Detail Modal -->
             <div id="employeeDetailModal" class="modal hidden">
                 <div class="modal-content modal-lg">
                     <div class="flex justify-between items-start">
@@ -683,6 +704,7 @@
                     </div>
                     
                     <div id="employeeProfileContent">
+                        <!-- Employee Info Section -->
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 border rounded-lg">
                             <div class="flex flex-col items-center md:col-span-1">
                                 <img id="modalEmployeePicture" src="https://placehold.co/150x150/e2e8f0/e2e8f0?text=." alt="Employee Picture" class="w-32 h-32 rounded-full object-cover mb-4 border-4 border-gray-200">
@@ -697,6 +719,7 @@
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                            <!-- Leave Management Section -->
                             <div>
                                  <h4 class="text-md font-semibold mb-2 pt-2">Leave Management</h4>
                                  <form id="leaveForm" class="mb-4 p-3 border rounded-lg bg-gray-50 no-print">
@@ -706,7 +729,7 @@
                                              <input type="month" id="leaveMonth" class="mt-1 w-full text-sm p-1" required>
                                          </div>
                                          <div>
-                                             <label for="leaveCount" class="text-xs">No. of Leaves</label>
+                                             <label for="leaveCount" class="text-xs">Leaves</label>
                                              <input type="number" id="leaveCount" min="0" class="mt-1 w-full text-sm p-1" required>
                                          </div>
                                          <div class="flex items-end">
@@ -723,6 +746,7 @@
                                  </div>
                             </div>
 
+                            <!-- Salary History Section -->
                             <div>
                                 <h4 class="text-md font-semibold mb-2 pt-2">Salary Management</h4>
                                 <form id="salaryForm" class="mb-4 p-3 border rounded-lg bg-gray-50 no-print">
@@ -766,12 +790,15 @@
             </div>
 
 
+            <!-- Print Footer -->
             <div class="print-footer">
                 <p>Developed by Afrasiab Asghar. Visit www.nextgensites.org or Contact +923060406003</p>
             </div>
         </main>
         
+        <!-- Print Views Container -->
         <div>
+            <!-- Salary Slip Print View -->
             <div id="salarySlipPrintView" class="print-only printable-view">
                  <div class="p-8 border-2 border-black" style="font-family: Arial, sans-serif; ">
                     <header class="text-center mb-8 pb-4 border-b-2 border-black">
@@ -835,11 +862,14 @@
                 </div>
             </div>
             
+            <!-- Employee Profile Print View -->
             <div id="employeeProfilePrintView" class="print-only printable-view">
-                 </div>
+                 <!-- Content will be injected by JS -->
+            </div>
         </div>
 
 
+        <!-- Footer -->
         <footer class="bg-gray-800 text-white text-center p-4 no-print">
             <p>&copy; <span id="currentYear"></span> Darson Securities Limited. All rights reserved.</p>
             <p class="text-sm text-gray-400">Developed by Afrasiab Asghar. Visit <a href="http://www.nextgensites.org" target="_blank" class="underline hover:text-gray-200">www.nextgensites.org</a> or Contact +923060406003</p>
@@ -910,7 +940,24 @@
             getCurrentMonthYearString: () => {
                 const now = new Date();
                 return `${now.getFullYear()}-${('0' + (now.getMonth() + 1)).slice(-2)}`;
-            }
+            },
+            compressImage: async (file) => {
+                const options = {
+                    maxSizeMB: 0.5, // Max file size 0.5MB
+                    maxWidthOrHeight: 800, // Resize to 800px on the longest side
+                    useWebWorker: true,
+                };
+                try {
+                    console.log(`Original file size ${file.size / 1024 / 1024} MB`);
+                    const compressedFile = await imageCompression(file, options);
+                    console.log(`Compressed file size ${compressedFile.size / 1024 / 1024} MB`);
+                    return compressedFile;
+                } catch (error) {
+                    console.error("Image compression error:", error);
+                    // If compression fails, return the original file
+                    return file;
+                }
+            },
         };
         
         document.getElementById('currentYear').textContent = new Date().getFullYear();
@@ -1045,16 +1092,16 @@
                      Utils.showConfirmationModal("Delete Report?", `Are you sure you want to delete the report for ${d}?`, async () => {
                         await FirebaseStorageService.removeItem(`transactions/${d}`);
                         delete AppState.dailyDataCache[d];
-                        document.getElementById('dailyReportDisplay').innerHTML = `<p class="text-green-500">Report for ${Utils.formatDateForDisplay(d)} deleted.</p>`;
+                        document.getElementById('dailyReportDisplay').innerHTML = `<p class="text-green-500">Report for ${Utils.formatDateForDisplay(d)} has been deleted.</p>`;
                         await BalanceTrackingController.updateOverallBalanceDisplay();
-                        Utils.showMessage('Success', 'Report deleted.');
+                        Utils.showMessage('Success', 'The report has been deleted.');
                      });
                 });
                 document.getElementById('viewMonthlyReportBtn').addEventListener('click', UIController.displayMonthlyReport);
                 document.getElementById('printMonthlyReportBtn').addEventListener('click', () => UIController.printReport('monthly'));
                 document.getElementById('deleteMonthlyReportBtn').addEventListener('click', async () => {
                     const m = document.getElementById('reportMonth').value; if (!m) { Utils.showMessage('Input Required', 'Select month to delete.'); return; }
-                    Utils.showConfirmationModal("Delete Month's Reports?", `Delete all daily reports for ${Utils.formatMonthForDisplay(m)}? This is irreversible.`, async () => {
+                    Utils.showConfirmationModal("Delete Monthly Reports?", `All daily reports for ${Utils.formatMonthForDisplay(m)} will be deleted. This action cannot be undone.`, async () => {
                         const allTransactions = await FirebaseStorageService.getItem('transactions') || {};
                         let c = 0;
                         const updates = {};
@@ -1066,9 +1113,9 @@
                         });
                         await db.ref(`users/${auth.currentUser.uid}`).update(updates); // Perform multi-path delete
                         delete AppState.monthlyDataCache[m];
-                        document.getElementById('monthlyReportDisplay').innerHTML = `<p class="text-green-500">Data for ${Utils.formatMonthForDisplay(m)} (${c} days) deleted.</p>`;
+                        document.getElementById('monthlyReportDisplay').innerHTML = `<p class="text-green-500">Data for ${Utils.formatMonthForDisplay(m)} (${c} days) has been deleted.</p>`;
                         await BalanceTrackingController.updateOverallBalanceDisplay();
-                        Utils.showMessage('Success', `${c} daily reports deleted.`);
+                        Utils.showMessage('Success', `${c} daily reports have been deleted.`);
                     });
                 });
 
@@ -1150,7 +1197,7 @@
 
             addTransactionToCurrentList: () => {
                 const sn = document.getElementById('stockName').value.trim(), q = parseInt(document.getElementById('quantity').value), r = parseFloat(document.getElementById('rate').value);
-                if (!sn || isNaN(q) || q <= 0 || isNaN(r) || r <= 0) { Utils.showMessage('Validation Error', 'Enter valid Stock Name, Quantity, and Rate.'); return; }
+                if (!sn || isNaN(q) || q <= 0 || isNaN(r) || r <= 0) { Utils.showMessage('Validation Error', 'Please enter a valid Stock Name, Quantity, and Rate.'); return; }
                 const { commissionPerStock, totalStockCommission } = CommissionService.calculateCommission(r, q);
                 AppState.currentTransactions.push({ 
                     tempId: Utils.generateId(), stockName: sn, quantity: q, rate: r, 
@@ -1200,7 +1247,7 @@
                 const targetDate = AppState.targetDateForDashboard;
                 if (AppState.currentTransactions.length === 0) {
                      await FirebaseStorageService.removeItem(`transactions/${targetDate}`);
-                     Utils.showMessage('Data Cleared', `All transactions for ${Utils.formatDateForDisplay(targetDate)} have been cleared and saved.`);
+                     Utils.showMessage('Data Cleared', `All transactions for ${Utils.formatDateForDisplay(targetDate)} have been cleared.`);
                      await BalanceTrackingController.updateOverallBalanceDisplay();
                      return;
                 }
@@ -1210,13 +1257,13 @@
                 const dailyReportDataToSave = { date: targetDate, transactions: transactionsToSave, ...deductions };
                 await FirebaseStorageService.setItem(`transactions/${targetDate}`, dailyReportDataToSave);
                 await BalanceTrackingController.updateOverallBalanceDisplay(); 
-                Utils.showMessage('Success', `Transactions for ${Utils.formatDateForDisplay(targetDate)} saved successfully.`);
+                Utils.showMessage('Success', `Transactions for ${Utils.formatDateForDisplay(targetDate)} have been saved.`);
             },
 
             displayDailyReport: async () => {
-                const rd = document.getElementById('reportDate').value; if (!rd) { Utils.showMessage('Input Required', 'Select date.'); return; }
+                const rd = document.getElementById('reportDate').value; if (!rd) { Utils.showMessage('Input Required', 'Please select a date.'); return; }
                 const data = await FirebaseStorageService.getItem(`transactions/${rd}`), displayDiv = document.getElementById('dailyReportDisplay');
-                if (!data) { displayDiv.innerHTML = `<p class="text-red-500">No data for ${Utils.formatDateForDisplay(rd)}.</p>`; displayDiv.classList.remove('hidden'); return; }
+                if (!data) { displayDiv.innerHTML = `<p class="text-red-500">No data found for ${Utils.formatDateForDisplay(rd)}.</p>`; displayDiv.classList.remove('hidden'); return; }
                 AppState.dailyDataCache[rd] = data;
                 let html = `<h3 class="text-xl font-semibold mb-2">Daily Report for ${Utils.formatDateForDisplay(rd)}</h3><div class="overflow-x-auto"><table class="min-w-full bg-white mb-4"><thead><tr><th>Stock</th><th>Qty</th><th>Rate</th><th>Comm/S</th><th>Total Comm.</th><th>Time</th></tr></thead><tbody>`;
                 (data.transactions || []).forEach(tx => { html += `<tr><td>${tx.stockName}</td><td>${tx.quantity}</td><td>${Utils.formatCurrency(tx.rate)}</td><td>${Utils.formatCurrency(tx.commissionPerStock)}</td><td>${Utils.formatCurrency(tx.totalStockCommission)}</td><td>${tx.transactionTime||'N/A'}</td></tr>`; });
@@ -1225,11 +1272,11 @@
             },
 
             displayMonthlyReport: async () => {
-                const rmy = document.getElementById('reportMonth').value; if (!rmy) { Utils.showMessage('Input Required', 'Select month.'); return; }
+                const rmy = document.getElementById('reportMonth').value; if (!rmy) { Utils.showMessage('Input Required', 'Please select a month.'); return; }
                 const allTransactions = await FirebaseStorageService.getItem('transactions') || {};
                 const reports = Object.values(allTransactions).filter(d => d && d.date && d.date.startsWith(rmy)).sort((a,b) => new Date(a.date) - new Date(b.date));
                 const displayDiv = document.getElementById('monthlyReportDisplay');
-                if (reports.length === 0) { displayDiv.innerHTML = `<p class="text-red-500">No data for ${Utils.formatMonthForDisplay(rmy)}.</p>`; displayDiv.classList.remove('hidden'); return; }
+                if (reports.length === 0) { displayDiv.innerHTML = `<p class="text-red-500">No data found for ${Utils.formatMonthForDisplay(rmy)}.</p>`; displayDiv.classList.remove('hidden'); return; }
                 let tg=0, th=0, tt=0, tf=0; reports.forEach(d => { tg+=d.grossCommission||0; th+=d.hoDeduction||0; tt+=d.taxDeduction||0; tf+=d.finalHouseCommission||0; });
                 AppState.monthlyDataCache[rmy] = { month: rmy, dailySummaries: reports, totalGross:tg, totalHO:th, totalTax:tt, totalFinal:tf };
                 let html = `<h3 class="text-xl font-semibold mb-2">Monthly Report for ${Utils.formatMonthForDisplay(rmy)}</h3><div class="overflow-x-auto"><table class="min-w-full bg-white mb-4"><thead><tr><th>Date</th><th>Gross</th><th>HO</th><th>Tax</th><th>Final</th></tr></thead><tbody>`;
@@ -1252,12 +1299,12 @@
                     EmployeeController.populateProfilePrintView(dataContext.employee);
                 }
                 else if (type === 'daily_current') {
-                    if (AppState.currentTransactions.length === 0) { Utils.showMessage('Error', 'No transactions on dashboard to print.'); return; }
+                    if (AppState.currentTransactions.length === 0) { Utils.showMessage('Error', 'There are no transactions on the dashboard to print.'); return; }
                     rTitle = `Daily Commission Report`; rDateStr = Utils.formatDateForDisplay(AppState.targetDateForDashboard); 
                     content = `<div class="page-container">${document.getElementById('dailyTransactionsTable').outerHTML}${document.getElementById('dailySummary').outerHTML}</div>`;
                 }
-                else if (type === 'daily_historical') { const d = document.getElementById('reportDate').value, data = AppState.dailyDataCache[d]; if (!data) { Utils.showMessage('Error', 'View daily report first.'); return; } rTitle = 'Daily Commission Report'; rDateStr = Utils.formatDateForDisplay(data.date); content = `<div class="page-container">${document.getElementById('dailyReportDisplay').innerHTML}</div>`; }
-                else if (type === 'monthly') { const m = document.getElementById('reportMonth').value, data = AppState.monthlyDataCache[m]; if (!data) { Utils.showMessage('Error', 'View monthly report first.'); return; } rTitle = 'Monthly Commission Report'; rDateStr = Utils.formatMonthForDisplay(data.month); content = `<div class="page-container">${document.getElementById('monthlyReportDisplay').innerHTML}</div>`; }
+                else if (type === 'daily_historical') { const d = document.getElementById('reportDate').value, data = AppState.dailyDataCache[d]; if (!data) { Utils.showMessage('Error', 'Please view the daily report first.'); return; } rTitle = 'Daily Commission Report'; rDateStr = Utils.formatDateForDisplay(data.date); content = `<div class="page-container">${document.getElementById('dailyReportDisplay').innerHTML}</div>`; }
+                else if (type === 'monthly') { const m = document.getElementById('reportMonth').value, data = AppState.monthlyDataCache[m]; if (!data) { Utils.showMessage('Error', 'Please view the monthly report first.'); return; } rTitle = 'Monthly Commission Report'; rDateStr = Utils.formatMonthForDisplay(data.month); content = `<div class="page-container">${document.getElementById('monthlyReportDisplay').innerHTML}</div>`; }
                 else if (type === 'paymentRequests') {
                     rTitle = 'Payment Requests Report';
                     const tableClone = document.getElementById('paymentRequestsTable').cloneNode(true);
@@ -1284,7 +1331,7 @@
                     tbl.querySelectorAll('.action-column, .bill-view-column').forEach(el => el.remove());
                     content = `<div class="page-container">${tbl.outerHTML}</div>`;
                 }
-                else { Utils.showMessage('Error', 'Unknown report type.'); return; }
+                else { Utils.showMessage('Error', 'Invalid report type.'); return; }
                 
                 titleEl.textContent = rTitle; dateEl.textContent = rDateStr; 
                 const origBody = document.body.innerHTML;
@@ -1377,11 +1424,11 @@
         
         const DataResetService = {
             initiateFullResetProcess: () => {
-                Utils.showConfirmationModal( "Confirm Data Reset", "Are you sure you want to erase ALL of your data? This is irreversible.",
+                Utils.showConfirmationModal( "Confirm Data Reset", "Are you sure you want to delete all your data? This action cannot be undone.",
                     () => {
                         DataResetService.performFullReset();
                     },
-                    () => { Utils.showMessage('Cancelled', 'Data reset process cancelled.'); } 
+                    () => { Utils.showMessage('Cancelled', 'The data reset process has been cancelled.'); } 
                 );
             },
             performFullReset: async () => {
@@ -1474,22 +1521,22 @@
             addManualBalanceAdjustment: async () => {
                 const amtIn = document.getElementById('manualCommissionAmount'), rsnIn = document.getElementById('manualCommissionReason');
                 const amt = parseFloat(amtIn.value), rsn = rsnIn.value.trim();
-                if (isNaN(amt) || amt === 0) { Utils.showMessage('Validation Error', 'Enter valid non-zero amount.'); return; }
-                if (!rsn) { Utils.showMessage('Validation Error', 'Enter reason.'); return; }
+                if (isNaN(amt) || amt === 0) { Utils.showMessage('Validation Error', 'Please enter a valid, non-zero amount.'); return; }
+                if (!rsn) { Utils.showMessage('Validation Error', 'Please enter a reason.'); return; }
                 const id = Utils.generateId();
                 const adj = { id: id, date: Utils.getTodayDateString(), amount: amt, reason: rsn, type: amt > 0 ? 'Credit' : 'Debit (Manual)' };
                 await db.ref(`users/${auth.currentUser.uid}/balanceAdjustments/${id}`).set(adj);
                 
                 await BalanceTrackingController.updateOverallBalanceDisplay(); 
                 await BalanceTrackingController.loadAdjustmentHistory();
-                amtIn.value = ''; rsnIn.value = ''; Utils.showMessage('Success', 'Balance adjusted.');
+                amtIn.value = ''; rsnIn.value = ''; Utils.showMessage('Success', 'Balance has been adjusted.');
             },
             loadAdjustmentHistory: async () => {
                 const histObj = await FirebaseStorageService.getItem('balanceAdjustments') || {};
                 const hist = Object.values(histObj).sort((a,b) => new Date(b.date) - new Date(a.date));
                 const tbody = document.getElementById('balanceAdjustmentHistoryTable').getElementsByTagName('tbody')[0]; 
                 tbody.innerHTML = '';
-                if (hist.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-3">No adjustments.</td></tr>'; return; }
+                if (hist.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-3">No adjustments found.</td></tr>'; return; }
                 hist.forEach(adj => {
                     const r = tbody.insertRow(); r.insertCell().textContent = Utils.formatDateForDisplay(adj.date); r.insertCell().textContent = adj.reason;
                     r.insertCell().textContent = Utils.formatCurrency(adj.amount); r.insertCell().textContent = adj.type;
@@ -1499,7 +1546,7 @@
             finalizeCurrentMonth: async () => {
                 const cmy = Utils.getCurrentMonthYearString();
                 const s = await BalanceTrackingController.getSettings();
-                if (s.lastFinalizedMonth === cmy) { Utils.showMessage('Info', `Month ${Utils.formatMonthForDisplay(cmy)} already finalized.`); return; }
+                if (s.lastFinalizedMonth === cmy) { Utils.showMessage('Info', `The month of ${Utils.formatMonthForDisplay(cmy)} has already been finalized.`); return; }
                 
                 const allTransactions = await FirebaseStorageService.getItem('transactions') || {};
                 let me = 0;
@@ -1508,9 +1555,9 @@
                 s.lastFinalizedMonth = cmy; 
                 await BalanceTrackingController.saveSettings(s);
                 const stEl = document.getElementById('newMonthStatus');
-                stEl.textContent = `Month ${Utils.formatMonthForDisplay(cmy)} finalized (Earnings: ${Utils.formatCurrency(me)}). Ready for new month.`;
+                stEl.textContent = `The month of ${Utils.formatMonthForDisplay(cmy)} has been finalized (Earnings: ${Utils.formatCurrency(me)}). Ready for the new month.`;
                 stEl.classList.add('text-green-600'); 
-                Utils.showMessage('Month Finalized', `Month ${Utils.formatMonthForDisplay(cmy)} earnings: ${Utils.formatCurrency(me)}.`);
+                Utils.showMessage('Month Finalized', `Earnings for ${Utils.formatMonthForDisplay(cmy)}: ${Utils.formatCurrency(me)}.`);
             }
         };
 
@@ -1521,20 +1568,20 @@
 
             handleAddRequest: async (e) => {
                 e.preventDefault(); const d = document.getElementById('paymentRequestDate').value, a = parseFloat(document.getElementById('paymentRequestAmount').value), desc = document.getElementById('paymentRequestDescription').value.trim();
-                if (!d || isNaN(a) || a <= 0 || !desc) { Utils.showMessage('Validation Error', 'Fill all fields.'); return; }
+                if (!d || isNaN(a) || a <= 0 || !desc) { Utils.showMessage('Validation Error', 'Please fill in all fields.'); return; }
                 const id = Utils.generateId();
                 const nr = { id: id, requestDate: d, amount: a, description: desc, status: 'Pending', entryDate: Utils.getTodayDateString() };
                 await db.ref(`users/${auth.currentUser.uid}/${PaymentRequestController.STORAGE_KEY}/${id}`).set(nr);
                 await PaymentRequestController.loadRequests(); 
                 document.getElementById('paymentRequestForm').reset(); 
-                Utils.showMessage('Success', 'Request submitted.');
+                Utils.showMessage('Success', 'Request submitted successfully.');
             },
             loadRequests: async () => {
                 const rsObj = await PaymentRequestController.getRequests();
-                const rs = Object.values(rsObj).sort((a,b) => new Date(b.requestDate) - new Date(a.requestDate));
+                const rs = Object.values(rsObj).sort((a,b) => new Date(b.requestDate) - new Date(a.date));
                 const tbody = document.getElementById('paymentRequestsTable').getElementsByTagName('tbody')[0]; 
                 tbody.innerHTML = '';
-                if (rs.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-3">No requests.</td></tr>'; }
+                if (rs.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-3">No requests found.</td></tr>'; }
                 else { rs.forEach(req => {
                         const r = tbody.insertRow(); r.insertCell().textContent = req.id.slice(-6).toUpperCase(); r.insertCell().textContent = Utils.formatDateForDisplay(req.requestDate);
                         r.insertCell().textContent = Utils.formatCurrency(req.amount); r.insertCell().textContent = req.description;
@@ -1562,7 +1609,7 @@
                     await db.ref(`users/${auth.currentUser.uid}/balanceAdjustments/${adjId}`).set(newAdjustment);
 
                     await BalanceTrackingController.updateOverallBalanceDisplay(); 
-                    Utils.showMessage('Status & Balance Updated', `Request status: ${newStatus}. ${Utils.formatCurrency(amountToDeduct)} deducted from balance.`);
+                    Utils.showMessage('Status & Balance Updated', `Request status: ${newStatus}. ${Utils.formatCurrency(amountToDeduct)} has been deducted from the balance.`);
                     if (AppState.currentPage === 'balanceTracking') await BalanceTrackingController.loadAdjustmentHistory();
                 } else { Utils.showMessage('Status Updated', `Request status: ${newStatus}.`); }
                 await PaymentRequestController.updatePaymentSummary(); 
@@ -1571,7 +1618,7 @@
                 Utils.showConfirmationModal('Delete Request', 'Are you sure you want to delete this payment request?', async () => {
                     await FirebaseStorageService.removeItem(`${PaymentRequestController.STORAGE_KEY}/${id}`);
                     await PaymentRequestController.loadRequests(); 
-                    Utils.showMessage('Deleted', 'Request deleted.');
+                    Utils.showMessage('Deleted', 'The request has been deleted.');
                 });
             },
             updatePaymentSummary: async () => {
@@ -1598,9 +1645,9 @@
                 let unpaidApprovedForCarryOver = 0;
                 rs.filter(req => req.requestDate.startsWith(cm) && req.status === 'Approved').forEach(req => unpaidApprovedForCarryOver += parseFloat(req.amount));
                 
-                if (unpaidApprovedForCarryOver <= 0) { Utils.showMessage('No Amount', 'No unpaid "Approved" amounts from current month to carry over.'); return; }
+                if (unpaidApprovedForCarryOver <= 0) { Utils.showMessage('No Amount', 'There is no unpaid "Approved" amount to carry over for this month.'); return; }
                 
-                Utils.showConfirmationModal('Carry Over Balance', `Carry over ${Utils.formatCurrency(unpaidApprovedForCarryOver)} (unpaid "Approved" from ${Utils.formatMonthForDisplay(cm)}) to balance adjustments as a negative (debit) entry? This will reflect as an expense covered.`, async () => {
+                Utils.showConfirmationModal('Carry Over Balance', `Carry over ${Utils.formatCurrency(unpaidApprovedForCarryOver)} (unpaid "Approved" from ${Utils.formatMonthForDisplay(cm)}) as a negative (debit) entry in balance adjustments? This will be shown as an expense.`, async () => {
                     const rsn = `Carried over unpaid approved from ${Utils.formatMonthForDisplay(cm)}`; 
                     const adjAmt = -unpaidApprovedForCarryOver; 
                     const adjId = Utils.generateId();
@@ -1608,7 +1655,7 @@
                     await db.ref(`users/${auth.currentUser.uid}/balanceAdjustments/${adjId}`).set(adj);
                     await BalanceTrackingController.updateOverallBalanceDisplay(); 
                     if(AppState.currentPage === 'balanceTracking') await BalanceTrackingController.loadAdjustmentHistory();
-                    Utils.showMessage('Carried Over', `${Utils.formatCurrency(unpaidApprovedForCarryOver)} adjusted in balance.`);
+                    Utils.showMessage('Carried Over', `${Utils.formatCurrency(unpaidApprovedForCarryOver)} has been adjusted in the balance.`);
                 });
             }
         };
@@ -1622,18 +1669,18 @@
                 e.preventDefault(); const typ = document.getElementById('courierType').value, dt = document.getElementById('courierDateSent').value, tid = document.getElementById('courierTrackingId').value.trim(),
                 sn = document.getElementById('courierSenderName').value.trim(), rn = document.getElementById('courierReceiverName').value.trim(), dst = document.getElementById('courierDestination').value.trim(),
                 st = document.getElementById('courierStatus').value.trim(), dsc = document.getElementById('courierDescription').value.trim();
-                if (!dt||!sn||!rn||!dst||!st) { Utils.showMessage('Validation Error', 'Fill required courier fields.'); return; }
+                if (!dt||!sn||!rn||!dst||!st) { Utils.showMessage('Validation Error', 'Please fill in the required courier fields.'); return; }
                 const id = Utils.generateId();
                 const ne = { id:id,type:typ,date:dt,trackingId:tid,senderName:sn,receiverName:rn,destination:dst,status:st,description:dsc,entryDate:Utils.getTodayDateString() };
                 await db.ref(`users/${auth.currentUser.uid}/${CourierTrackingController.STORAGE_KEY}/${id}`).set(ne);
                 await CourierTrackingController.loadEntries(); 
-                document.getElementById('courierTrackingForm').reset(); Utils.showMessage('Success', 'Courier entry added.');
+                document.getElementById('courierTrackingForm').reset(); Utils.showMessage('Success', 'Courier entry added successfully.');
             },
             loadEntries: async () => {
                 const esObj = await CourierTrackingController.getEntries();
                 const es = Object.values(esObj).sort((a,b) => new Date(b.date) - new Date(a.date));
                 const tbody = document.getElementById('courierTrackingTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
-                if (es.length === 0) { tbody.innerHTML = '<tr><td colspan="10" class="text-center text-gray-500 py-3">No courier records.</td></tr>'; return; }
+                if (es.length === 0) { tbody.innerHTML = '<tr><td colspan="10" class="text-center text-gray-500 py-3">No courier records found.</td></tr>'; return; }
                 es.forEach(en => {
                     const r = tbody.insertRow(); r.insertCell().textContent = en.id.slice(-6).toUpperCase(); r.insertCell().textContent = en.type.charAt(0).toUpperCase()+en.type.slice(1);
                     r.insertCell().textContent = Utils.formatDateForDisplay(en.date); r.insertCell().textContent = en.trackingId||'N/A'; r.insertCell().textContent = en.senderName;
@@ -1651,7 +1698,7 @@
                  Utils.showConfirmationModal('Delete Courier Entry', 'Are you sure you want to delete this courier entry?', async () => {
                     await FirebaseStorageService.removeItem(`${CourierTrackingController.STORAGE_KEY}/${id}`);
                     await CourierTrackingController.loadEntries(); 
-                    Utils.showMessage('Deleted', 'Courier entry deleted.');
+                    Utils.showMessage('Deleted', 'The courier entry has been deleted.');
                 });
             }
         };
@@ -1662,44 +1709,69 @@
 
             getEntries: async () => await FirebaseStorageService.getItem(BranchBudgetController.STORAGE_KEY) || {},
 
-            previewBillImages: (ev) => { 
+            previewBillImages: async (ev) => { 
                 BranchBudgetController.tempBillImagesBase64 = [];
-                const previewsContainer = document.getElementById('billImagePreviewsContainer'); previewsContainer.innerHTML = '';
-                const files = ev.target.files;
+                const previewsContainer = document.getElementById('billImagePreviewsContainer'); 
+                previewsContainer.innerHTML = '';
+                const files = Array.from(ev.target.files);
                 if (files.length > 0) {
                     previewsContainer.classList.remove('hidden');
-                    Array.from(files).forEach((file, index) => {
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
-                            BranchBudgetController.tempBillImagesBase64.push(e.target.result);
-                            const imgWrapper = document.createElement('div'); imgWrapper.classList.add('relative', 'inline-block');
-                            const img = document.createElement('img'); img.src = e.target.result; img.alt = `Preview ${index + 1}`;
-                            img.classList.add('max-h-32', 'max-w-xs', 'rounded', 'border', 'p-1', 'object-contain');
-                            imgWrapper.appendChild(img); previewsContainer.appendChild(imgWrapper);
-                        };
-                        reader.readAsDataURL(file);
-                    });
-                } else { previewsContainer.classList.add('hidden'); }
+                    Utils.showMessage('Compressing...', `Optimizing ${files.length} image(s). Please wait.`);
+
+                    try {
+                        const compressionPromises = files.map(file => Utils.compressImage(file));
+                        const compressedFiles = await Promise.all(compressionPromises);
+                        
+                        const readerPromises = compressedFiles.map(compressedFile => {
+                            return new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = (e) => {
+                                    const base64String = e.target.result;
+                                    BranchBudgetController.tempBillImagesBase64.push(base64String);
+                                    
+                                    const imgWrapper = document.createElement('div');
+                                    imgWrapper.classList.add('relative', 'inline-block');
+                                    const img = document.createElement('img');
+                                    img.src = base64String;
+                                    img.classList.add('max-h-32', 'max-w-xs', 'rounded', 'border', 'p-1', 'object-contain');
+                                    imgWrapper.appendChild(img);
+                                    previewsContainer.appendChild(imgWrapper);
+                                    resolve();
+                                };
+                                reader.onerror = reject;
+                                reader.readAsDataURL(compressedFile);
+                            });
+                        });
+                        await Promise.all(readerPromises);
+                        Utils.hideMessageModal();
+                    } catch (error) {
+                        console.error("Image compression error:", error);
+                        Utils.showMessage('Error', 'One or more images could not be compressed.');
+                        Utils.hideMessageModal();
+                    }
+                } else { 
+                    previewsContainer.classList.add('hidden'); 
+                }
             },
 
             handleAddEntry: async (e) => {
                 e.preventDefault(); 
                 const dt = document.getElementById('budgetEntryDate').value, itm = document.getElementById('budgetItem').value.trim(), amt = parseFloat(document.getElementById('budgetAmount').value);
-                if (!dt||!itm||isNaN(amt)||amt<=0) { Utils.showMessage('Validation Error', 'Fill Date, Item, and Amount.'); return; }
+                if (!dt||!itm||isNaN(amt)||amt<=0) { Utils.showMessage('Validation Error', 'Please enter Date, Item, and Amount.'); return; }
                 const id = Utils.generateId();
                 const ne = { id:id, date:dt, item:itm, amount:amt, billImagesBase64: BranchBudgetController.tempBillImagesBase64, entryDate:Utils.getTodayDateString() };
                 await db.ref(`users/${auth.currentUser.uid}/${BranchBudgetController.STORAGE_KEY}/${id}`).set(ne);
                 await BranchBudgetController.loadEntries();
                 document.getElementById('branchBudgetForm').reset(); document.getElementById('billImagePreviewsContainer').innerHTML = ''; 
                 document.getElementById('billImagePreviewsContainer').classList.add('hidden'); BranchBudgetController.tempBillImagesBase64 = []; 
-                Utils.showMessage('Success', 'Budget entry added.');
+                Utils.showMessage('Success', 'Budget entry added successfully.');
             },
 
             loadEntries: async () => {
                 const esObj = await BranchBudgetController.getEntries();
                 const es = Object.values(esObj).sort((a,b) => new Date(b.date) - new Date(a.date));
                 const tbody = document.getElementById('branchBudgetTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
-                if (es.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-3">No budget entries.</td></tr>'; return; }
+                if (es.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-3">No budget entries found.</td></tr>'; return; }
                 es.forEach(en => {
                     const r = tbody.insertRow(); r.insertCell().textContent = en.id.slice(-6).toUpperCase(); r.insertCell().textContent = Utils.formatDateForDisplay(en.date);
                     r.insertCell().textContent = en.item; r.insertCell().textContent = Utils.formatCurrency(en.amount);
@@ -1719,7 +1791,7 @@
                 Utils.showConfirmationModal('Delete Budget Entry', 'Are you sure you want to delete this budget entry?', async () => {
                     await FirebaseStorageService.removeItem(`${BranchBudgetController.STORAGE_KEY}/${id}`);
                     await BranchBudgetController.loadEntries(); 
-                    Utils.showMessage('Deleted', 'Budget entry deleted.');
+                    Utils.showMessage('Deleted', 'The budget entry has been deleted.');
                 });
             },
 
@@ -1788,15 +1860,24 @@
                 EmployeeController.tempPictureBase64 = null;
             },
 
-            previewEmployeePicture: (event) => {
+            previewEmployeePicture: async (event) => {
                 const file = event.target.files[0];
                 if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        document.getElementById('employeePicturePreview').src = e.target.result;
-                        EmployeeController.tempPictureBase64 = e.target.result;
-                    };
-                    reader.readAsDataURL(file);
+                    try {
+                        Utils.showMessage('Compressing...', 'Optimizing image, please wait.');
+                        const compressedFile = await Utils.compressImage(file);
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            document.getElementById('employeePicturePreview').src = e.target.result;
+                            EmployeeController.tempPictureBase64 = e.target.result;
+                            Utils.hideMessageModal();
+                        };
+                        reader.readAsDataURL(compressedFile);
+                    } catch (error) {
+                        console.error("Image compression error:", error);
+                        Utils.showMessage('Error', 'Image could not be compressed. Please try another image.');
+                        Utils.hideMessageModal();
+                    }
                 }
             },
             
@@ -1832,7 +1913,7 @@
 
                 await EmployeeController.loadEmployees();
                 EmployeeController.clearForm();
-                Utils.showMessage('Success', `Employee ${id ? 'updated' : 'saved'} successfully.`);
+                Utils.showMessage('Success', `Employee has been ${id ? 'updated' : 'saved'}.`);
             },
             
             loadEmployees: async () => {
@@ -1911,7 +1992,7 @@
 
             handleDeleteEmployeeFromModal: (e) => {
                 const id = e.currentTarget.dataset.employeeId;
-                Utils.showConfirmationModal('Delete Employee?', 'Are you sure you want to delete this employee and all their records? This cannot be undone.', async () => {
+                Utils.showConfirmationModal('Delete Employee?', 'Are you sure you want to delete this employee and all their records? This action cannot be undone.', async () => {
                     await EmployeeController.deleteEmployee(id);
                 });
             },
@@ -1937,7 +2018,7 @@
                 tbody.innerHTML = '';
                 const salaries = employee.salaries ? Object.values(employee.salaries) : [];
                 if (salaries.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-3">No salary records.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-3">No salary records found.</td></tr>';
                     return;
                 }
                 const sortedSalaries = salaries.sort((a, b) => b.month.localeCompare(a.month));
@@ -1977,7 +2058,7 @@
                 const incentives = parseFloat(document.getElementById('salaryIncentives').value) || 0;
 
                 if (!month || (amount + allowances + incentives) <= 0) {
-                    Utils.showMessage('Validation Error', 'Please select a month and enter a valid salary amount.'); return;
+                    Utils.showMessage('Validation Error', 'Select a month and enter a valid salary amount.'); return;
                 }
                 const newSalaryRecord = { month, amount, allowances, incentives, status: 'Unpaid' };
                 await db.ref(`users/${auth.currentUser.uid}/${EmployeeController.STORAGE_KEY}/${employeeId}/salaries/${month}`).set(newSalaryRecord);
@@ -2010,7 +2091,7 @@
 
             populateProfilePrintView: (employee) => {
                 const salaries = employee.salaries ? Object.values(employee.salaries) : [];
-                let salaryHistoryHtml = '<tr><td colspan="3" class="text-center">No salary history.</td></tr>';
+                let salaryHistoryHtml = '<tr><td colspan="3" class="text-center">No salary history found.</td></tr>';
                 if(salaries.length > 0) {
                     salaryHistoryHtml = salaries.sort((a,b) => b.month.localeCompare(a.month)).map(s => `
                         <tr>
@@ -2022,7 +2103,7 @@
                 }
 
                 const leaves = employee.leaves ? Object.values(employee.leaves) : [];
-                let leaveHistoryHtml = '<tr><td colspan="2" class="text-center">No leave history.</td></tr>';
+                let leaveHistoryHtml = '<tr><td colspan="2" class="text-center">No leave history found.</td></tr>';
                 if(leaves.length > 0) {
                      leaveHistoryHtml = leaves.sort((a,b) => b.month.localeCompare(a.month)).map(l => `
                         <tr>
@@ -2074,7 +2155,7 @@
                 tbody.innerHTML = '';
                 const leaves = employee.leaves ? Object.values(employee.leaves) : [];
                 if (leaves.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="2" class="text-center text-gray-500 py-3">No leave records.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="2" class="text-center text-gray-500 py-3">No leave records found.</td></tr>';
                     return;
                 }
                 const sortedLeaves = leaves.sort((a, b) => b.month.localeCompare(a.month));
@@ -2092,7 +2173,7 @@
                 const count = parseInt(document.getElementById('leaveCount').value);
 
                 if (!month || isNaN(count) || count < 0) {
-                    Utils.showMessage('Validation Error', 'Please select a month and enter a valid number of leaves.'); return;
+                    Utils.showMessage('Validation Error', 'Select a month and enter a valid number of leaves.'); return;
                 }
 
                 await db.ref(`users/${auth.currentUser.uid}/${EmployeeController.STORAGE_KEY}/${employeeId}/leaves/${month}`).set({ month, count });
