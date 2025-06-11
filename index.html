@@ -6,11 +6,9 @@
     <title>Darson Securities Commission Software</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
-    <!-- Image Compression Library -->
     <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
     <style>
         /* Custom scrollbar for better aesthetics */
@@ -191,6 +189,7 @@
                 font-size: 10pt; /* Smaller font for print */
                 margin: 0;
                 padding: 0;
+                padding-bottom: 50px; /* Space for the fixed footer */
             }
             nav, .no-print, #sidebar, .modal {
                 display: none !important;
@@ -217,6 +216,8 @@
                 font-size: 8pt;
                 position: fixed;
                 bottom: 10px;
+                left: 0;
+                right: 0;
                 width: 100%;
                 color: black !important;
             }
@@ -224,7 +225,10 @@
                 font-size: 9pt;
                 border: 1px solid #ccc !important; /* Add borders for tables in print */
             }
-            th, td { border: 1px solid #ccc !important; padding: 4px 6px; }
+            th, td { 
+                border: 1px solid #ccc !important; 
+                padding: 2px 4px; /* Reduced padding for smaller boxes */
+            }
             th { background-color: #eee !important; color: black !important; }
             a { text-decoration: none; color: black; }
             img { max-width: 100% !important; page-break-inside: avoid; }
@@ -245,7 +249,6 @@
 </head>
 <body class="bg-gray-100">
 
-    <!-- Authentication Page -->
     <div id="authPage" class="flex items-center justify-center min-h-screen">
         <div class="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-lg">
             <div>
@@ -302,9 +305,7 @@
     </div>
 
 
-    <!-- Main App Wrapper (Initially Hidden) -->
     <div id="app" class="hidden flex-col min-h-screen">
-        <!-- Navigation -->
         <nav id="sidebar" class="p-4 shadow-md">
             <div class="container mx-auto flex flex-wrap items-center justify-between">
                 <div class="text-2xl font-bold">Darson Securities</div>
@@ -324,16 +325,13 @@
             </div>
         </nav>
 
-        <!-- Main Content Area -->
         <main class="container mx-auto p-4 flex-grow">
-            <!-- Print Header (for all printable sections) -->
             <div class="print-header">
                 <h1>Darson Securities Limited</h1>
                 <h2 id="printReportTitle">Commission Report</h2>
                 <p>Date: <span id="printReportDate"></span></p>
             </div>
 
-            <!-- Dashboard Page -->
             <div id="dashboardPage" class="page-container">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Commission Calculator</h2>
                 <div class="mb-6 p-4 border rounded-lg bg-indigo-50">
@@ -383,7 +381,7 @@
                                 <th class="py-2 px-4 border-b">Rate</th>
                                 <th class="py-2 px-4 border-b">Comm. per Stock</th>
                                 <th class="py-2 px-4 border-b">Total Comm.</th>
-                                <th class="py-2 px-4 border-b">Action</th>
+                                <th class="py-2 px-4 border-b no-print">Action</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -402,7 +400,6 @@
                 </div>
             </div>
 
-            <!-- Employees Page -->
             <div id="employeesPage" class="page-container hidden">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Employee Management</h2>
                 <form id="employeeForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
@@ -443,11 +440,9 @@
 
                 <h3 class="text-xl font-semibold mb-4">Saved Employees</h3>
                 <div id="employeeList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Employee cards will be populated here -->
-                </div>
+                    </div>
             </div>
 
-            <!-- Reports Page -->
             <div id="reportsPage" class="page-container hidden">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Reports</h2>
                 <div class="mb-6 p-4 border rounded-lg bg-gray-50">
@@ -479,11 +474,9 @@
                 <div id="monthlyReportDisplay" class="mt-6 hidden"></div>
             </div>
 
-            <!-- Balance Tracking Page -->
             <div id="balanceTrackingPage" class="page-container hidden">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Balance Tracking & Settings</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <!-- Column 1 -->
                     <div class="space-y-6">
                         <div class="p-6 bg-blue-50 rounded-lg shadow">
                             <h3 class="text-xl font-semibold text-blue-700 mb-2">Overall Balance</h3>
@@ -504,7 +497,6 @@
                             <p id="newMonthStatus" class="mt-2 text-sm text-gray-700"></p>
                         </div>
                     </div>
-                    <!-- Column 2 -->
                     <div class="space-y-6">
                         <div class="p-6 bg-purple-50 rounded-lg shadow">
                             <h3 class="text-xl font-semibold text-purple-700 mb-3"><i class="fas fa-database mr-2"></i>Data Backup & Restore</h3>
@@ -532,7 +524,6 @@
                 </div>
             </div>
 
-            <!-- Payment Requests Page -->
             <div id="paymentRequestsPage" class="page-container hidden">
                  <h2 class="text-2xl font-semibold mb-6 page-title">Payment Requests</h2>
                 <form id="paymentRequestForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
@@ -573,7 +564,6 @@
                 </div>
             </div>
 
-            <!-- Courier Tracking Page -->
             <div id="courierTrackingPage" class="page-container hidden">
                  <h2 class="text-2xl font-semibold mb-6 page-title">Courier Tracking</h2>
                 <form id="courierTrackingForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
@@ -626,7 +616,6 @@
                 </div>
             </div>
 
-            <!-- Branch Budget Page -->
             <div id="branchBudgetPage" class="page-container hidden">
                 <h2 class="text-2xl font-semibold mb-6 page-title">Branch Budget Management</h2>
                  <form id="branchBudgetForm" class="mb-8 p-6 border rounded-lg bg-gray-50">
@@ -666,7 +655,6 @@
                 </div>
             </div>
             
-            <!-- Generic Message Modal -->
             <div id="messageModal" class="modal hidden">
                 <div class="modal-content">
                     <h3 id="messageModalTitle" class="modal-title">Notification</h3>
@@ -678,7 +666,6 @@
                 </div>
             </div>
 
-            <!-- Bill Preview Modal -->
             <div id="billPreviewModal" class="modal hidden">
                 <div class="modal-content modal-lg"> 
                     <h3 id="billPreviewModalTitle" class="modal-title">Bill Preview</h3>
@@ -691,7 +678,6 @@
                 </div>
             </div>
             
-            <!-- Employee Detail Modal -->
             <div id="employeeDetailModal" class="modal hidden">
                 <div class="modal-content modal-lg">
                     <div class="flex justify-between items-start">
@@ -704,7 +690,6 @@
                     </div>
                     
                     <div id="employeeProfileContent">
-                        <!-- Employee Info Section -->
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 border rounded-lg">
                             <div class="flex flex-col items-center md:col-span-1">
                                 <img id="modalEmployeePicture" src="https://placehold.co/150x150/e2e8f0/e2e8f0?text=." alt="Employee Picture" class="w-32 h-32 rounded-full object-cover mb-4 border-4 border-gray-200">
@@ -719,7 +704,6 @@
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                            <!-- Leave Management Section -->
                             <div>
                                  <h4 class="text-md font-semibold mb-2 pt-2">Leave Management</h4>
                                  <form id="leaveForm" class="mb-4 p-3 border rounded-lg bg-gray-50 no-print">
@@ -746,7 +730,6 @@
                                  </div>
                             </div>
 
-                            <!-- Salary History Section -->
                             <div>
                                 <h4 class="text-md font-semibold mb-2 pt-2">Salary Management</h4>
                                 <form id="salaryForm" class="mb-4 p-3 border rounded-lg bg-gray-50 no-print">
@@ -790,15 +773,12 @@
             </div>
 
 
-            <!-- Print Footer -->
             <div class="print-footer">
                 <p>Developed by Afrasiab Asghar. Visit www.nextgensites.org or Contact +923060406003</p>
             </div>
         </main>
         
-        <!-- Print Views Container -->
         <div>
-            <!-- Salary Slip Print View -->
             <div id="salarySlipPrintView" class="print-only printable-view">
                  <div class="p-8 border-2 border-black" style="font-family: Arial, sans-serif; ">
                     <header class="text-center mb-8 pb-4 border-b-2 border-black">
@@ -862,14 +842,11 @@
                 </div>
             </div>
             
-            <!-- Employee Profile Print View -->
             <div id="employeeProfilePrintView" class="print-only printable-view">
-                 <!-- Content will be injected by JS -->
-            </div>
+                 </div>
         </div>
 
 
-        <!-- Footer -->
         <footer class="bg-gray-800 text-white text-center p-4 no-print">
             <p>&copy; <span id="currentYear"></span> Darson Securities Limited. All rights reserved.</p>
             <p class="text-sm text-gray-400">Developed by Afrasiab Asghar. Visit <a href="http://www.nextgensites.org" target="_blank" class="underline hover:text-gray-200">www.nextgensites.org</a> or Contact +923060406003</p>
@@ -1222,7 +1199,9 @@
                     row.insertCell().textContent = tx.stockName; row.insertCell().textContent = tx.quantity; 
                     row.insertCell().textContent = Utils.formatCurrency(tx.rate); row.insertCell().textContent = Utils.formatCurrency(tx.commissionPerStock); 
                     row.insertCell().textContent = Utils.formatCurrency(tx.totalStockCommission);
-                    const ac = row.insertCell(); const rmBtn = document.createElement('button'); 
+                    const ac = row.insertCell(); 
+                    ac.classList.add('no-print');
+                    const rmBtn = document.createElement('button'); 
                     rmBtn.innerHTML = '<i class="fas fa-trash-alt"></i>'; rmBtn.classList.add('btn', 'btn-danger', 'btn-icon', 'text-xs');
                     rmBtn.onclick = () => UIController.removeTransactionFromCurrentList(tx.tempId); 
                     ac.appendChild(rmBtn);
