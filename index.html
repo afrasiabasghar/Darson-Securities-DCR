@@ -626,7 +626,14 @@
                             <input type="date" id="budgetEntryDate" class="mt-1 w-full" required>
                         </div>
                         <div>
-                            <label for="budgetItem" class="block text-sm font-medium">Item/Expense Details</label>
+                             <label for="budgetEntryType" class="block text-sm font-medium">Type</label>
+                            <select id="budgetEntryType" class="mt-1 w-full">
+                                <option value="cash-out">Cash Out (Expense)</option>
+                                <option value="cash-in">Cash In (Income)</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="budgetItem" class="block text-sm font-medium">Item/Details</label>
                             <input type="text" id="budgetItem" class="mt-1 w-full" required>
                         </div>
                         <div class="md:col-span-2">
@@ -634,20 +641,49 @@
                             <input type="number" id="budgetAmount" class="mt-1 w-full" min="0.01" step="0.01" required>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary mt-4"><i class="fas fa-save mr-2"></i>Save Budget Entry</button>
+                    <button type="submit" class="btn btn-primary mt-4"><i class="fas fa-save mr-2"></i>Save Entry</button>
                 </form>
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-semibold">Budget Entries</h3>
-                    <button id="printBudgetReportBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Budget Report</button>
+
+                <div class="my-8 border-t pt-8"></div>
+
+                <div class="mb-6 p-4 border rounded-lg bg-gray-50">
+                    <h3 class="text-xl font-semibold mb-3">View Monthly Budget Report</h3>
+                    <div class="flex flex-col sm:flex-row gap-4 items-end">
+                         <div class="flex-grow">
+                            <label for="budgetReportMonth" class="block text-sm font-medium text-gray-700">Select Month:</label>
+                            <input type="month" id="budgetReportMonth" class="mt-1 p-2 border rounded-md w-full">
+                        </div>
+                        <button id="viewMonthlyBudgetBtn" class="btn btn-primary w-full sm:w-auto"><i class="fas fa-calendar-alt mr-2"></i>View Report</button>
+                    </div>
                 </div>
-                <div class="overflow-x-auto">
-                    <table id="branchBudgetTable" class="min-w-full bg-white">
-                        <thead><tr><th>ID</th><th>Date</th><th>Item</th><th>Amount</th><th class="action-column">Actions</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-                <div id="budgetSummary" class="mt-6 p-4 bg-gray-100 rounded-lg text-right">
-                    <p class="text-xl font-bold">Total Expenses: <span id="totalBudgetAmount" class="text-red-700">PKR 0.00</span></p>
+
+                <div id="monthlyBudgetReportDisplay" class="mt-6 hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold">Budget Entries</h3>
+                        <button id="printBudgetReportBtn" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Print Report</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table id="branchBudgetTable" class="min-w-full bg-white">
+                            <thead><tr><th>ID</th><th>Date</th><th>Type</th><th>Details</th><th>Amount</th><th class="action-column">Actions</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div id="budgetSummary" class="mt-6 p-6 bg-gray-100 rounded-lg">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                            <div>
+                                <p class="text-sm text-gray-500">Total Cash In</p>
+                                <p id="totalCashIn" class="text-2xl font-bold text-green-600">PKR 0.00</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Total Cash Out</p>
+                                <p id="totalCashOut" class="text-2xl font-bold text-red-600">PKR 0.00</p>
+                            </div>
+                             <div>
+                                <p class="text-sm text-gray-500">Remaining Balance</p>
+                                <p id="remainingBudgetBalance" class="text-2xl font-bold text-blue-700">PKR 0.00</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -1037,6 +1073,7 @@
                 document.getElementById('dashboardDateInput').value = AppState.targetDateForDashboard; 
                 document.getElementById('reportDate').value = Utils.getTodayDateString();
                 document.getElementById('reportMonth').value = Utils.getCurrentMonthYearString();
+                document.getElementById('budgetReportMonth').value = Utils.getCurrentMonthYearString();
 
                 // Dashboard Listeners
                 document.getElementById('dashboardDateInput').addEventListener('change', () => {
@@ -1111,7 +1148,9 @@
 
                 // Branch Budget Listeners
                 document.getElementById('branchBudgetForm').addEventListener('submit', BranchBudgetController.handleAddEntry);
+                document.getElementById('viewMonthlyBudgetBtn').addEventListener('click', BranchBudgetController.loadEntries);
                 document.getElementById('printBudgetReportBtn').addEventListener('click', () => UIController.printReport('branchBudget'));
+
 
                 // Employee Detail Modal Listeners
                 document.getElementById('closeEmployeeDetailModalBtn').addEventListener('click', EmployeeController.hideEmployeeDetailModal);
@@ -1134,7 +1173,7 @@
                     if (pageId === 'balanceTracking') { await BalanceTrackingController.updateOverallBalanceDisplay(); await BalanceTrackingController.loadAdjustmentHistory(); }
                     if (pageId === 'paymentRequests') await PaymentRequestController.loadRequests();
                     if (pageId === 'courierTracking') await CourierTrackingController.loadEntries();
-                    if (pageId === 'branchBudget') await BranchBudgetController.loadEntries();
+                    if (pageId === 'branchBudget') await BranchBudgetController.loadEntries(true); // Pass flag to prevent showing monthly report on initial load
                     if (pageId === 'reports') { document.getElementById('dailyReportDisplay').classList.add('hidden').innerHTML = ''; document.getElementById('monthlyReportDisplay').classList.add('hidden').innerHTML = ''; }
                 } else console.error(`Page ${pageId}Page not found.`);
             },
@@ -1297,12 +1336,16 @@
                     });
                     content = `<div class="page-container">${tableClone.outerHTML}</div>`;
                 }
-                else if (type === 'branchBudget') {
-                    rTitle = 'Branch Budget Report';
-                    let tbl = document.getElementById('branchBudgetTable').cloneNode(true);
-                    tbl.querySelectorAll('.action-column').forEach(el => el.remove());
-                    let summary = document.getElementById('budgetSummary').cloneNode(true);
-                    content = `<div class="page-container">${tbl.outerHTML}${summary.outerHTML}</div>`;
+                 else if (type === 'branchBudget') {
+                    const month = document.getElementById('budgetReportMonth').value;
+                    if (!document.getElementById('monthlyBudgetReportDisplay').classList.contains('hidden')) {
+                        rTitle = `Branch Budget Report for ${Utils.formatMonthForDisplay(month)}`;
+                        const reportContent = document.getElementById('monthlyBudgetReportDisplay').cloneNode(true);
+                        reportContent.querySelector('#printBudgetReportBtn').remove(); // Remove button from print
+                        content = `<div class="page-container">${reportContent.innerHTML}</div>`;
+                    } else {
+                         Utils.showMessage('Error', 'Please view a monthly budget report first to print.'); return;
+                    }
                 }
                 else { Utils.showMessage('Error', 'Invalid report type.'); return; }
                 
@@ -1683,30 +1726,74 @@
 
             handleAddEntry: async (e) => {
                 e.preventDefault(); 
-                const dt = document.getElementById('budgetEntryDate').value, itm = document.getElementById('budgetItem').value.trim(), amt = parseFloat(document.getElementById('budgetAmount').value);
-                if (!dt||!itm||isNaN(amt)||amt<=0) { Utils.showMessage('Validation Error', 'Please enter Date, Item, and Amount.'); return; }
+                const dt = document.getElementById('budgetEntryDate').value;
+                const type = document.getElementById('budgetEntryType').value;
+                const itm = document.getElementById('budgetItem').value.trim();
+                const amt = parseFloat(document.getElementById('budgetAmount').value);
+
+                if (!dt||!itm||isNaN(amt)||amt<=0) { Utils.showMessage('Validation Error', 'Please enter Date, Details, and a valid Amount.'); return; }
+                
                 const id = Utils.generateId();
-                const ne = { id:id, date:dt, item:itm, amount:amt, entryDate:Utils.getTodayDateString() };
-                await db.ref(`users/${auth.currentUser.uid}/${BranchBudgetController.STORAGE_KEY}/${id}`).set(ne);
+                const newEntry = { id:id, date:dt, type: type, item:itm, amount:amt, entryDate:Utils.getTodayDateString() };
+                
+                await db.ref(`users/${auth.currentUser.uid}/${BranchBudgetController.STORAGE_KEY}/${id}`).set(newEntry);
+                
                 await BranchBudgetController.loadEntries();
                 document.getElementById('branchBudgetForm').reset();
+                document.getElementById('budgetEntryDate').value = Utils.getTodayDateString(); // Reset date to today
                 Utils.showMessage('Success', 'Budget entry added successfully.');
             },
 
-            loadEntries: async () => {
-                const esObj = await BranchBudgetController.getEntries();
-                const es = Object.values(esObj).sort((a,b) => new Date(b.date) - new Date(a.date));
-                const tbody = document.getElementById('branchBudgetTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
+            loadEntries: async (isInitialLoad = false) => {
+                const reportDiv = document.getElementById('monthlyBudgetReportDisplay');
                 
-                if (es.length === 0) { 
-                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500 py-3">No budget entries found.</td></tr>'; 
+                if (isInitialLoad) {
+                    reportDiv.classList.add('hidden');
+                    return;
+                }
+
+                const month = document.getElementById('budgetReportMonth').value;
+                if (!month) {
+                    Utils.showMessage("Input required", "Please select a month to view the report.");
+                    return;
+                }
+                
+                reportDiv.classList.remove('hidden');
+
+                const allEntriesObj = await BranchBudgetController.getEntries();
+                const allEntries = Object.values(allEntriesObj);
+                
+                const monthlyEntries = allEntries.filter(entry => entry.date.startsWith(month)).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+                const tbody = document.getElementById('branchBudgetTable').getElementsByTagName('tbody')[0]; 
+                tbody.innerHTML = '';
+                
+                let totalIn = 0;
+                let totalOut = 0;
+
+                if (monthlyEntries.length === 0) { 
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-gray-500 py-3">No budget entries found for ${Utils.formatMonthForDisplay(month)}.</td></tr>`; 
                 } else {
-                    es.forEach(en => {
+                    monthlyEntries.forEach(en => {
                         const r = tbody.insertRow(); 
+                        
+                        // Calculate totals
+                        if (en.type === 'cash-in') {
+                            totalIn += parseFloat(en.amount);
+                        } else {
+                            totalOut += parseFloat(en.amount);
+                        }
+                        
                         r.insertCell().textContent = en.id.slice(-6).toUpperCase(); 
                         r.insertCell().textContent = Utils.formatDateForDisplay(en.date);
+                        
+                        const typeCell = r.insertCell();
+                        typeCell.textContent = en.type === 'cash-in' ? 'Cash In' : 'Cash Out';
+                        typeCell.className = en.type === 'cash-in' ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold';
+
                         r.insertCell().textContent = en.item; 
                         r.insertCell().textContent = Utils.formatCurrency(en.amount);
+                        
                         const ac = r.insertCell(); 
                         ac.classList.add('action-column'); 
                         const delBtn = document.createElement('button'); 
@@ -1717,9 +1804,13 @@
                     });
                 }
                 
-                // Calculate and display total
-                const total = es.reduce((sum, entry) => sum + parseFloat(entry.amount), 0);
-                document.getElementById('totalBudgetAmount').textContent = Utils.formatCurrency(total);
+                const remainingBalance = totalIn - totalOut;
+
+                document.getElementById('totalCashIn').textContent = Utils.formatCurrency(totalIn);
+                document.getElementById('totalCashOut').textContent = Utils.formatCurrency(totalOut);
+                const balanceEl = document.getElementById('remainingBudgetBalance');
+                balanceEl.textContent = Utils.formatCurrency(remainingBalance);
+                balanceEl.className = `text-2xl font-bold ${remainingBalance >= 0 ? 'text-blue-700' : 'text-red-700'}`;
             },
 
             deleteEntry: (id) => {
