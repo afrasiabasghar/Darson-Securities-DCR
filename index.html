@@ -629,16 +629,9 @@
                             <label for="budgetItem" class="block text-sm font-medium">Item/Expense Details</label>
                             <input type="text" id="budgetItem" class="mt-1 w-full" required>
                         </div>
-                        <div>
+                        <div class="md:col-span-2">
                             <label for="budgetAmount" class="block text-sm font-medium">Amount (PKR)</label>
                             <input type="number" id="budgetAmount" class="mt-1 w-full" min="0.01" step="0.01" required>
-                        </div>
-                        <div>
-                            <label for="budgetBillImages" class="block text-sm font-medium">Upload Bill(s) (Image)</label>
-                            <input type="file" id="budgetBillImages" accept="image/*" multiple class="mt-1 w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                        </div>
-                        <div class="md:col-span-2">
-                            <div id="billImagePreviewsContainer" class="hidden mt-2 flex flex-wrap gap-2 p-2 border rounded-md bg-gray-50 min-h-[50px]"></div>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary mt-4"><i class="fas fa-save mr-2"></i>Save Budget Entry</button>
@@ -649,9 +642,12 @@
                 </div>
                 <div class="overflow-x-auto">
                     <table id="branchBudgetTable" class="min-w-full bg-white">
-                        <thead><tr><th>ID</th><th>Date</th><th>Item</th><th>Amount</th><th>Bill(s)</th><th class="action-column">Actions</th></tr></thead>
+                        <thead><tr><th>ID</th><th>Date</th><th>Item</th><th>Amount</th><th class="action-column">Actions</th></tr></thead>
                         <tbody></tbody>
                     </table>
+                </div>
+                <div id="budgetSummary" class="mt-6 p-4 bg-gray-100 rounded-lg text-right">
+                    <p class="text-xl font-bold">Total Expenses: <span id="totalBudgetAmount" class="text-red-700">PKR 0.00</span></p>
                 </div>
             </div>
             
@@ -1115,10 +1111,7 @@
 
                 // Branch Budget Listeners
                 document.getElementById('branchBudgetForm').addEventListener('submit', BranchBudgetController.handleAddEntry);
-                document.getElementById('budgetBillImages').addEventListener('change', BranchBudgetController.previewBillImages);
                 document.getElementById('printBudgetReportBtn').addEventListener('click', () => UIController.printReport('branchBudget'));
-                document.getElementById('closeBillPreviewModalBtn').addEventListener('click', BranchBudgetController.hideBillPreviewModal);
-                document.getElementById('printBillFromModalBtn').addEventListener('click', BranchBudgetController.printSpecificBillFromModal);
 
                 // Employee Detail Modal Listeners
                 document.getElementById('closeEmployeeDetailModalBtn').addEventListener('click', EmployeeController.hideEmployeeDetailModal);
@@ -1307,8 +1300,9 @@
                 else if (type === 'branchBudget') {
                     rTitle = 'Branch Budget Report';
                     let tbl = document.getElementById('branchBudgetTable').cloneNode(true);
-                    tbl.querySelectorAll('.action-column, .bill-view-column').forEach(el => el.remove());
-                    content = `<div class="page-container">${tbl.outerHTML}</div>`;
+                    tbl.querySelectorAll('.action-column').forEach(el => el.remove());
+                    let summary = document.getElementById('budgetSummary').cloneNode(true);
+                    content = `<div class="page-container">${tbl.outerHTML}${summary.outerHTML}</div>`;
                 }
                 else { Utils.showMessage('Error', 'Invalid report type.'); return; }
                 
@@ -1684,65 +1678,18 @@
 
         const BranchBudgetController = {
             STORAGE_KEY: 'branchBudgetEntries', 
-            tempBillImagesBase64: [], 
 
             getEntries: async () => await FirebaseStorageService.getItem(BranchBudgetController.STORAGE_KEY) || {},
-
-            previewBillImages: async (ev) => { 
-                BranchBudgetController.tempBillImagesBase64 = [];
-                const previewsContainer = document.getElementById('billImagePreviewsContainer'); 
-                previewsContainer.innerHTML = '';
-                const files = Array.from(ev.target.files);
-                if (files.length > 0) {
-                    previewsContainer.classList.remove('hidden');
-                    Utils.showMessage('Compressing...', `Optimizing ${files.length} image(s). Please wait.`);
-
-                    try {
-                        const compressionPromises = files.map(file => Utils.compressImage(file));
-                        const compressedFiles = await Promise.all(compressionPromises);
-                        
-                        const readerPromises = compressedFiles.map(compressedFile => {
-                            return new Promise((resolve, reject) => {
-                                const reader = new FileReader();
-                                reader.onload = (e) => {
-                                    const base64String = e.target.result;
-                                    BranchBudgetController.tempBillImagesBase64.push(base64String);
-                                    
-                                    const imgWrapper = document.createElement('div');
-                                    imgWrapper.classList.add('relative', 'inline-block');
-                                    const img = document.createElement('img');
-                                    img.src = base64String;
-                                    img.classList.add('max-h-32', 'max-w-xs', 'rounded', 'border', 'p-1', 'object-contain');
-                                    imgWrapper.appendChild(img);
-                                    previewsContainer.appendChild(imgWrapper);
-                                    resolve();
-                                };
-                                reader.onerror = reject;
-                                reader.readAsDataURL(compressedFile);
-                            });
-                        });
-                        await Promise.all(readerPromises);
-                        Utils.hideMessageModal();
-                    } catch (error) {
-                        console.error("Image compression error:", error);
-                        Utils.showMessage('Error', 'One or more images could not be compressed.');
-                        Utils.hideMessageModal();
-                    }
-                } else { 
-                    previewsContainer.classList.add('hidden'); 
-                }
-            },
 
             handleAddEntry: async (e) => {
                 e.preventDefault(); 
                 const dt = document.getElementById('budgetEntryDate').value, itm = document.getElementById('budgetItem').value.trim(), amt = parseFloat(document.getElementById('budgetAmount').value);
                 if (!dt||!itm||isNaN(amt)||amt<=0) { Utils.showMessage('Validation Error', 'Please enter Date, Item, and Amount.'); return; }
                 const id = Utils.generateId();
-                const ne = { id:id, date:dt, item:itm, amount:amt, billImagesBase64: BranchBudgetController.tempBillImagesBase64, entryDate:Utils.getTodayDateString() };
+                const ne = { id:id, date:dt, item:itm, amount:amt, entryDate:Utils.getTodayDateString() };
                 await db.ref(`users/${auth.currentUser.uid}/${BranchBudgetController.STORAGE_KEY}/${id}`).set(ne);
                 await BranchBudgetController.loadEntries();
-                document.getElementById('branchBudgetForm').reset(); document.getElementById('billImagePreviewsContainer').innerHTML = ''; 
-                document.getElementById('billImagePreviewsContainer').classList.add('hidden'); BranchBudgetController.tempBillImagesBase64 = []; 
+                document.getElementById('branchBudgetForm').reset();
                 Utils.showMessage('Success', 'Budget entry added successfully.');
             },
 
@@ -1750,20 +1697,29 @@
                 const esObj = await BranchBudgetController.getEntries();
                 const es = Object.values(esObj).sort((a,b) => new Date(b.date) - new Date(a.date));
                 const tbody = document.getElementById('branchBudgetTable').getElementsByTagName('tbody')[0]; tbody.innerHTML = '';
-                if (es.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-3">No budget entries found.</td></tr>'; return; }
-                es.forEach(en => {
-                    const r = tbody.insertRow(); r.insertCell().textContent = en.id.slice(-6).toUpperCase(); r.insertCell().textContent = Utils.formatDateForDisplay(en.date);
-                    r.insertCell().textContent = en.item; r.insertCell().textContent = Utils.formatCurrency(en.amount);
-                    const bc = r.insertCell(); bc.classList.add('bill-view-column');
-                    if (en.billImagesBase64 && en.billImagesBase64.length > 0) { 
-                        const viewBtn = document.createElement('button'); viewBtn.textContent = `View Bill(s) (${en.billImagesBase64.length})`;
-                        viewBtn.classList.add('text-blue-600', 'hover:underline', 'text-sm', 'p-0', 'bg-transparent', 'border-none', 'cursor-pointer');
-                        viewBtn.onclick = () => BranchBudgetController.showBillPreviewModal(en.billImagesBase64, en.item); bc.appendChild(viewBtn);
-                    } else { bc.textContent='No Bill(s)'; }
-                    const ac = r.insertCell(); ac.classList.add('action-column'); 
-                    const delBtn = document.createElement('button'); delBtn.innerHTML='<i class="fas fa-trash-alt"></i>'; 
-                    delBtn.classList.add('btn','btn-danger','btn-icon','text-xs'); delBtn.onclick=()=>BranchBudgetController.deleteEntry(en.id); ac.appendChild(delBtn);
-                });
+                
+                if (es.length === 0) { 
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500 py-3">No budget entries found.</td></tr>'; 
+                } else {
+                    es.forEach(en => {
+                        const r = tbody.insertRow(); 
+                        r.insertCell().textContent = en.id.slice(-6).toUpperCase(); 
+                        r.insertCell().textContent = Utils.formatDateForDisplay(en.date);
+                        r.insertCell().textContent = en.item; 
+                        r.insertCell().textContent = Utils.formatCurrency(en.amount);
+                        const ac = r.insertCell(); 
+                        ac.classList.add('action-column'); 
+                        const delBtn = document.createElement('button'); 
+                        delBtn.innerHTML='<i class="fas fa-trash-alt"></i>'; 
+                        delBtn.classList.add('btn','btn-danger','btn-icon','text-xs'); 
+                        delBtn.onclick=()=>BranchBudgetController.deleteEntry(en.id); 
+                        ac.appendChild(delBtn);
+                    });
+                }
+                
+                // Calculate and display total
+                const total = es.reduce((sum, entry) => sum + parseFloat(entry.amount), 0);
+                document.getElementById('totalBudgetAmount').textContent = Utils.formatCurrency(total);
             },
 
             deleteEntry: (id) => {
@@ -1773,56 +1729,6 @@
                     Utils.showMessage('Deleted', 'The budget entry has been deleted.');
                 });
             },
-
-            showBillPreviewModal: (imagesBase64Array, itemName) => {
-                document.getElementById('billPreviewModalTitle').textContent = `Bill Preview: ${itemName || 'Bill'}`;
-                const modalImagesContainer = document.getElementById('billPreviewImagesContainer');
-                modalImagesContainer.innerHTML = '';
-                const printBillBtnModal = document.getElementById('printBillFromModalBtn');
-                
-                if (imagesBase64Array && imagesBase64Array.length > 0) {
-                    imagesBase64Array.forEach((base64) => {
-                        const img = document.createElement('img');
-                        img.src = base64;
-                        img.classList.add('bill-preview-img', 'max-w-full', 'max-h-[55vh]', 'object-contain', 'mb-2', 'border', 'rounded', 'cursor-pointer', 'p-1');
-                        img.onclick = () => {
-                            // Clear previous selection
-                            modalImagesContainer.querySelectorAll('img').forEach(i => i.classList.remove('selected'));
-                            // Select current image
-                            img.classList.add('selected');
-                            printBillBtnModal.dataset.billImage = base64;
-                            printBillBtnModal.disabled = false;
-                        };
-                        modalImagesContainer.appendChild(img);
-                    });
-                } else {
-                     modalImagesContainer.textContent = "No bills to display.";
-                }
-                BranchBudgetController.hideBillPreviewModal(true); // Reset button state
-                document.getElementById('billPreviewModal').classList.remove('hidden');
-            },
-
-            hideBillPreviewModal: (isOpening = false) => {
-                const printBillBtnModal = document.getElementById('printBillFromModalBtn');
-                printBillBtnModal.disabled = true;
-                delete printBillBtnModal.dataset.billImage;
-                if (!isOpening) {
-                    document.getElementById('billPreviewModal').classList.add('hidden');
-                    document.getElementById('billPreviewImagesContainer').innerHTML = ""; 
-                }
-            },
-            
-            printSpecificBillFromModal: () => {
-                const imageBase64 = document.getElementById('printBillFromModalBtn').dataset.billImage;
-                if (!imageBase64) { Utils.showMessage('Error', 'Please select a bill to print.'); return; }
-                const printWindow = window.open('', '_blank', 'height=700,width=900'); 
-                printWindow.document.write('<html><head><title>Print Bill</title>');
-                printWindow.document.write('<style> body { margin: 20mm; } img { max-width: 100%; height: auto; } @page { size: A4; margin: 20mm; } </style>');
-                printWindow.document.write('</head><body>');
-                printWindow.document.write(`<img src="${imageBase64}" onload="window.focus(); setTimeout(() => { window.print(); setTimeout(() => printWindow.close(), 200); }, 200);">`);
-                printWindow.document.write('</body></html>');
-                printWindow.document.close(); 
-            }
         };
 
         const EmployeeController = {
